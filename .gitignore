@@ -1,0 +1,7 @@
+rastro/venv/
+rastro/data/rastro.db
+rastro/__pycache__/
+rastro/src/__pycache__/
+rastro/notebooks/.ipynb_checkpoints/
+*.pyc
+__pycache__/
