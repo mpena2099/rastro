@@ -42,7 +42,11 @@ FIELD_RA_MAX = 150.5
 FIELD_DEC_MIN = 19.5
 FIELD_DEC_MAX = 20.5
 PM_THRESHOLD_ARCSEC = 0.15
-ROW_LIMIT = 5000
+# Teto de linhas do TOP na Fase 2. Alto de proposito: serve so de guarda contra
+# runaway, nao pra "caber" o campo. Com os filtros server-side (PM + SNR + flags)
+# o campo 1x1 volta ~4.6k fontes completo; se bater ROW_LIMIT, a Fase 2 aborta
+# avisando de truncagem em vez de seguir com meio campo.
+ROW_LIMIT = 20000
 
 # Fase 3 — quality filter
 W1SNR_MIN = 5.0
@@ -81,9 +85,11 @@ LLM_STRUCTURED = False
 LLM_TEMPERATURE = 0.3
 LLM_MAX_TOKENS = 800
 
-# Pausa entre chamadas na Fase 5, pra ficar sob o rate limit do free tier
-# (Groq free = 30 req/min -> ~2.1s por chamada evita 429). 0 = sem pausa.
-LLM_REQUEST_DELAY_S = 2.1
+# Pausa entre chamadas na Fase 5, pra ficar sob o rate limit do free tier.
+# No Groq free (llama-3.3-70b) o gargalo NAO e requisicoes/min e sim TOKENS/min
+# (TPM = 12k). Cada triagem gasta ~1.1k tokens, entao ~6.5s por chamada mantem
+# < 12k TPM (a cota diaria de requisicoes, 1000/dia, sobra). 0 = sem pausa.
+LLM_REQUEST_DELAY_S = 6.5
 
 # Exemplos de outros providers (descomente e ajuste a chave):
 # Gemini:     LLM_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai"; LLM_MODEL="gemini-2.5-flash-lite"; LLM_API_KEY_ENV="GEMINI_API_KEY"; LLM_API_KEY_FILE_PROVIDER="gemini"

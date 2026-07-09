@@ -8,6 +8,8 @@ from config import (
     FIELD_DEC_MIN,
     FIELD_DEC_MAX,
     PM_THRESHOLD_ARCSEC,
+    W1SNR_MIN,
+    W2SNR_MIN,
     ROW_LIMIT,
     SQLITE_PATH,
 )
@@ -15,6 +17,9 @@ from config import (
 
 def build_query() -> str:
     cols = ",\n       ".join(CATWISE_COLUMNS)
+    # Cortes de qualidade grosseiros (SNR + flags) ficam no servidor pra o campo
+    # inteiro caber sob o TOP e nao truncar (spec 10.1). A Fase 3 faz os cortes
+    # finos (cc_flags/ab_flags/pmcode/n_aw) que exigem logica no cliente.
     return f"""
 SELECT TOP {ROW_LIMIT}
        {cols}
@@ -23,6 +28,8 @@ WHERE ra BETWEEN {FIELD_RA_MIN} AND {FIELD_RA_MAX}
   AND dec BETWEEN {FIELD_DEC_MIN} AND {FIELD_DEC_MAX}
   AND ka = 3 AND km = 3
   AND SQRT(POWER(pmra,2) + POWER(pmdec,2)) > {PM_THRESHOLD_ARCSEC}
+  AND w1snr >= {W1SNR_MIN} AND w2snr >= {W2SNR_MIN}
+  AND w1flg < 8 AND w2flg < 8
 """
 
 
@@ -45,6 +52,17 @@ def run():
 
     df = result.to_table().to_pandas()
     print(f"Fontes retornadas: {len(df)}")
+
+    # Guarda contra truncagem silenciosa: se veio exatamente ROW_LIMIT, o TOP
+    # provavelmente cortou o resultado (o campo tem mais fontes que o teto) e a
+    # cobertura fica espacialmente incompleta. Para e avisa em vez de seguir com
+    # meio campo (armadilha da spec 10.4).
+    if len(df) >= ROW_LIMIT:
+        raise RuntimeError(
+            f"Fase 2 retornou {len(df)} = ROW_LIMIT ({ROW_LIMIT}): resultado "
+            "provavelmente TRUNCADO (campo incompleto). Suba ROW_LIMIT, encolha "
+            "o campo, ou aperte os filtros (PM/SNR) em config.py."
+        )
 
     SQLITE_PATH.parent.mkdir(parents=True, exist_ok=True)
 

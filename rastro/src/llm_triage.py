@@ -121,14 +121,16 @@ def call_llm(prompt: str, api_key: str, max_retries: int = 5) -> tuple[str, str]
 
         if resp.status_code == 429:
             # Cota diaria estourada (free tier): retry nao adianta ate resetar.
-            # Falha rapido em vez de gastar todos os retries a toa.
-            if "PerDay" in resp.text:
+            # Falha rapido em vez de gastar todos os retries a toa. Cobre os
+            # formatos de Gemini ("...PerDay...") e Groq ("...per day (TPD)...").
+            if re.search(r"per\s*day|\bTPD\b|PerDay", resp.text, re.IGNORECASE):
                 raise RuntimeError(
-                    "cota diaria do free tier esgotada para o modelo "
-                    f"{LLM_MODEL} (reseta a meia-noite PT). Troque de modelo/"
-                    "provider em config.py ou ative billing."
+                    f"cota diaria do free tier esgotada para {LLM_MODEL} "
+                    "(reseta no fim do dia, fuso do provider). Espere o reset, "
+                    "troque de modelo/provider em config.py, ou ative billing. "
+                    f"Detalhe: {resp.text[:200]}"
                 )
-            # Limite por minuto (RPM): espera a janela reabrir e tenta de novo.
+            # Limite por minuto (RPM/TPM): espera a janela reabrir e tenta de novo.
             if attempt < max_retries - 1:
                 wait = _retry_wait_seconds(resp)
                 print(f"  429 rate limit; aguardando {wait:.0f}s e retentando "
