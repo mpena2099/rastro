@@ -53,9 +53,41 @@ N_AW_MAX = 1
 SIMBAD_RADIUS_ARCSEC = 5
 SIMBAD_DELAY_S = 0.3
 
-# Fase 5 — LLM triage
-OPENROUTER_API_KEY_PATH = Path.home() / ".local" / "share" / "opencode" / "auth.json"
-LLM_MODEL = "openai/gpt-4o-mini"
+# Fase 5 — LLM triage (provider-agnostico, endpoint OpenAI-compativel)
+#
+# Funciona com qualquer provider que exponha /chat/completions no formato
+# OpenAI: Gemini (via camada OpenAI-compat), OpenRouter, Groq, Ollama local.
+# Trocar de provider = mudar LLM_BASE_URL + LLM_MODEL + de onde vem a chave.
+#
+# Default: Groq free tier. Pegue a chave (sem cartao) em https://console.groq.com
+# e exporte  export GROQ_API_KEY=...  (ou adicione um provider "groq" no
+# auth.json estilo opencode). Ollama local nao precisa de chave.
+LLM_BASE_URL = "https://api.groq.com/openai/v1"
+LLM_MODEL = "llama-3.3-70b-versatile"
+
+# Chave da API: lida da env var abaixo; se ausente, cai no arquivo auth.json
+# (data[<provider>]["key"]). Deixe LLM_API_KEY_ENV = None p/ providers sem
+# chave, como Ollama local.
+LLM_API_KEY_ENV = "GROQ_API_KEY"
+LLM_API_KEY_FILE = Path.home() / ".local" / "share" / "opencode" / "auth.json"
+LLM_API_KEY_FILE_PROVIDER = "groq"
+
+# Structured output via response_format json_schema. Atencao: nem todo modelo
+# suporta. llama-3.3-70b no Groq NAO suporta (retorna 400), entao aqui fica
+# False e a Fase 5 usa o modo texto (parse do "VEREDITO:" na resposta). Modelos
+# que suportam json_schema (Gemini, gpt-oss, GLM): pode por True. Se True e o
+# modelo nao suportar, o codigo remove o param e cai pro texto (custa 1 req a mais).
+LLM_STRUCTURED = False
 LLM_TEMPERATURE = 0.3
-LLM_MAX_TOKENS = 512
+LLM_MAX_TOKENS = 800
+
+# Pausa entre chamadas na Fase 5, pra ficar sob o rate limit do free tier
+# (Groq free = 30 req/min -> ~2.1s por chamada evita 429). 0 = sem pausa.
+LLM_REQUEST_DELAY_S = 2.1
+
+# Exemplos de outros providers (descomente e ajuste a chave):
+# Gemini:     LLM_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai"; LLM_MODEL="gemini-2.5-flash-lite"; LLM_API_KEY_ENV="GEMINI_API_KEY"; LLM_API_KEY_FILE_PROVIDER="gemini"
+# OpenRouter: LLM_BASE_URL="https://openrouter.ai/api/v1"; LLM_MODEL="openai/gpt-oss-20b:free"; LLM_API_KEY_FILE_PROVIDER="openrouter"
+# Zhipu:      LLM_BASE_URL="https://api.z.ai/api/paas/v4"; LLM_MODEL="glm-4.7-flash"; LLM_API_KEY_ENV="ZHIPU_API_KEY"; LLM_API_KEY_FILE_PROVIDER="zhipu"
+# Ollama:     LLM_BASE_URL="http://localhost:11434/v1"; LLM_MODEL="qwen2.5:7b"; LLM_API_KEY_ENV=None
 LLM_BATCH_SIZE = 30

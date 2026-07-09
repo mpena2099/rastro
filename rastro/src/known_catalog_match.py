@@ -1,4 +1,5 @@
 import sqlite3
+import sys
 import pandas as pd
 from astropy.table import Table
 from astroquery.xmatch import XMatch
