@@ -67,7 +67,11 @@ SIMBAD_DELAY_S = 0.3
 # e exporte  export GROQ_API_KEY=...  (ou adicione um provider "groq" no
 # auth.json estilo opencode). Ollama local nao precisa de chave.
 LLM_BASE_URL = "https://api.groq.com/openai/v1"
-LLM_MODEL = "llama-3.3-70b-versatile"
+# A cota do Groq (TPM e TPD) e POR MODELO. llama-3.3-70b-versatile e melhor mas
+# tem TPD 100k/dia; se esgotar, troque aqui pra outro modelo com cota propria
+# (ex: llama-3.1-8b-instant). Ajuste LLM_REQUEST_DELAY_S junto (TPM difere:
+# 70b=12k/min, 8b=6k/min).
+LLM_MODEL = "llama-3.1-8b-instant"
 
 # Chave da API: lida da env var abaixo; se ausente, cai no arquivo auth.json
 # (data[<provider>]["key"]). Deixe LLM_API_KEY_ENV = None p/ providers sem
@@ -86,10 +90,10 @@ LLM_TEMPERATURE = 0.3
 LLM_MAX_TOKENS = 800
 
 # Pausa entre chamadas na Fase 5, pra ficar sob o rate limit do free tier.
-# No Groq free (llama-3.3-70b) o gargalo NAO e requisicoes/min e sim TOKENS/min
-# (TPM = 12k). Cada triagem gasta ~1.1k tokens, entao ~6.5s por chamada mantem
-# < 12k TPM (a cota diaria de requisicoes, 1000/dia, sobra). 0 = sem pausa.
-LLM_REQUEST_DELAY_S = 6.5
+# No Groq free o gargalo NAO e requisicoes/min e sim TOKENS/min (TPM). Cada
+# triagem gasta ~1.1k tokens. Ajuste ao TPM do modelo: llama-3.1-8b = 6k/min
+# -> ~12s; llama-3.3-70b = 12k/min -> ~6.5s. 0 = sem pausa.
+LLM_REQUEST_DELAY_S = 12
 
 # Exemplos de outros providers (descomente e ajuste a chave):
 # Gemini:     LLM_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai"; LLM_MODEL="gemini-2.5-flash-lite"; LLM_API_KEY_ENV="GEMINI_API_KEY"; LLM_API_KEY_FILE_PROVIDER="gemini"
