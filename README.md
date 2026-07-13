@@ -143,4 +143,4 @@ rastro/
 
 ## Projeto conceitual
 
-A especificação técnica completa (motivação, fundamentação, armadilhas, referências) está em [`../projeto-rastro-especificacao-tecnica.md`](../projeto-rastro-especificacao-tecnica.md).
+A especificação técnica completa (motivação, fundamentação, armadilhas, referências) está em [`projeto-rastro-especificacao-tecnica.md`](projeto-rastro-especificacao-tecnica.md).
