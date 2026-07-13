@@ -71,6 +71,31 @@ python -c "from src.llm_triage import run; run()"
 
 A **Fase 1 é o portão de aceite**: se o movimento próprio de Luhman 16 não bater com a referência, ela chama `sys.exit(1)` e para tudo. Use-a pra validar que IRSA/SIMBAD estão respondendo.
 
+## Como testar
+
+Há dois níveis de teste, do mais rápido ao mais completo:
+
+**1. Testes de unidade (offline, sem rede, instantâneos).** Cobrem a lógica pura que quebra calada se alguém mexer: derivação de movimento próprio, parsing do score da LLM (incluindo a regra "`alta` só via veredito explícito") e a montagem da query da Fase 2.
+
+```bash
+python tests/test_units.py      # runner embutido, sem dependencia
+# ou, se tiver pytest:  python -m pytest tests/
+```
+
+**2. Teste de sanidade / integração (Fase 1, usa rede).** É o verdadeiro teste de aceite do sistema: redescobre um objeto real conhecido (Luhman 16) no CatWISE2020 e confere se o movimento próprio medido bate com a referência. Se isso falhar, a stack de dados está com problema e não adianta seguir.
+
+```bash
+python -c "from src.sanity_check import run; run()"
+```
+
+Para exercitar só a triagem da LLM (precisa de chave configurada, ver abaixo) sem rodar as fases de dados:
+
+```bash
+python -c "from src.llm_triage import run; run()"
+```
+
+Não há mocks das APIs externas (IRSA/SIMBAD/LLM): a filosofia aqui é validar contra os serviços reais via Fase 1, já que a corretude depende justamente de os catálogos responderem o esperado.
+
 ## Triagem por LLM (Fase 5)
 
 É **provider-agnóstico**: fala o formato OpenAI (`/chat/completions`) via `httpx`, sem SDK. Trocar de provider é só mudar três coisas em `config.py`: `LLM_BASE_URL`, `LLM_MODEL` e de onde vem a chave. Há exemplos comentados pra Gemini, OpenRouter, Zhipu e Ollama.
