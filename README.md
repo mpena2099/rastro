@@ -55,8 +55,9 @@ Fases sequenciais. Cada uma lê a tabela produzida pela anterior no SQLite e gra
 
 ## Como usar
 
+A partir da raiz do repositório:
+
 ```bash
-cd rastro
 python3 -m venv venv && source venv/bin/activate   # se ainda nao existir
 pip install -r requirements.txt
 export PYTHONUNBUFFERED=1
@@ -124,10 +125,12 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
 ## Estrutura
 
 ```
-rastro/
+.
 ├── pipeline.py              # entrypoint (roda as fases 1-5)
 ├── config.py                # toda a parametrizacao
 ├── requirements.txt
+├── README.md
+├── projeto-rastro-especificacao-tecnica.md   # spec conceitual
 ├── src/
 │   ├── sanity_check.py      # Fase 1
 │   ├── fetch_field.py       # Fase 2
@@ -135,10 +138,12 @@ rastro/
 │   ├── known_catalog_match.py # Fase 4
 │   ├── llm_triage.py        # Fase 5
 │   └── proper_motion.py     # util (pm_total, cor_w1w2)
+├── tests/
+│   └── test_units.py        # testes de unidade offline
 ├── notebooks/
 │   └── inspecao_visual.ipynb # Fase 6
 └── data/
-    └── rastro.db
+    └── rastro.db            # resultados (gitignored)
 ```
 
 ## Projeto conceitual
