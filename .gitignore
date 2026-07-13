@@ -1,7 +1,16 @@
-rastro/venv/
-rastro/data/rastro.db
-rastro/__pycache__/
-rastro/src/__pycache__/
-rastro/notebooks/.ipynb_checkpoints/
-*.pyc
+# Python
 __pycache__/
+*.pyc
+
+# Ambiente virtual
+venv/
+.venv/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Dados / resultados (SQLite regeneravel pelo pipeline)
+data/rastro.db
+
+# Segredos locais
+.env
