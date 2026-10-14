@@ -44,7 +44,7 @@ A Fase 1 não grava no banco; só valida e imprime.
 
 **`config.py` é a fonte única de toda parametrização** (coordenadas do campo, limiares de PM/SNR/flags, alvos de sanidade, modelo LLM, caminhos). Alterar comportamento do pipeline = editar `config.py`, não os módulos. Os caminhos derivam de `ROOT = config.py.parent`, ou seja, a raiz do repositório.
 
-**`proper_motion.add_pm_columns(df)`** deriva `pm_total` (√(pmra²+pmdec²)) e `cor_w1w2` (w1mpro−w2mpro). Precisa ser chamada antes de qualquer filtro ou ordenação que dependa dessas colunas; elas não vêm do catálogo.
+**`proper_motion.add_pm_columns(df)`** deriva `pm_total` (√(pmra²+pmdec²)), `cor_w1w2` (w1mpro−w2mpro) e, se houver `sigpmra`/`sigpmdec`, `pm_signif` (pm_total/σ). Precisa ser chamada antes de qualquer filtro ou ordenação que dependa dessas colunas; elas não vêm do catálogo.
 
 **Fonte de dados:** CatWISE2020 via `astroquery.ipac.irsa.Irsa` (cone search na Fase 1, query ADQL/TAP na Fase 2). Cross-match da Fase 4 usa CDS `XMatch` em batch contra SIMBAD, com fallback sequencial linha-a-linha (`_fallback_sequential`) se o batch falhar. Chamadas a SIMBAD/IRSA têm retry com `time.sleep` porque os serviços são instáveis; preserve esse padrão ao mexer nelas.
 

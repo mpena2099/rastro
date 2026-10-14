@@ -21,6 +21,7 @@ from src.proper_motion import add_pm_columns
 from src.llm_triage import parse_score, interpret_response
 from src.fetch_field import build_query
 from src.quality_filter import pmcode_isolado
+from src.known_catalog_match import posicao_j2000, MJD_J2000
 import config
 
 
@@ -29,6 +30,14 @@ def test_add_pm_columns():
     out = add_pm_columns(df)
     assert abs(out["pm_total"].iloc[0] - 5.0) < 1e-9      # sqrt(3^2 + 4^2)
     assert abs(out["cor_w1w2"].iloc[0] - 2.0) < 1e-9      # w1 - w2
+    assert "pm_signif" not in out                          # sem sigpm, nao calcula
+
+
+def test_pm_signif():
+    # pm=5, sigpm iguais a 0.5 nos dois eixos -> sigma(pm)=0.5 -> 10 sigma
+    df = pd.DataFrame({"pmra": [3.0], "pmdec": [4.0], "sigpmra": [0.5], "sigpmdec": [0.5],
+                       "w1mpro": [10.0], "w2mpro": [8.0]})
+    assert abs(add_pm_columns(df)["pm_signif"].iloc[0] - 10.0) < 1e-9
 
 
 def test_parse_score_veredito_explicito():
@@ -66,6 +75,16 @@ def test_pmcode_isolado():
     # ABCCC: A = componentes no blend, B = troca de primario. So A=1,B=N passa.
     s = pd.Series(["1N000", "1N013", "2N000", "3N001", "1Y000", None, ""])
     assert pmcode_isolado(s).tolist() == [True, True, False, False, False, False, False]
+
+
+def test_posicao_j2000():
+    # 10 anos depois de J2000, pmdec=+1"/ano e pmra=+1"/ano em dec=60 (cos=0.5):
+    # volta 10" em dec e 20" em coordenada RA (10" no ceu / cos dec).
+    df = pd.DataFrame({"ra": [100.0], "dec": [60.0], "pmra": [1.0], "pmdec": [1.0],
+                       "meanobsmjd": [MJD_J2000 + 10 * 365.25]})
+    ra, dec = posicao_j2000(df)
+    assert abs((100.0 - ra.iloc[0]) * 3600 - 20.0) < 1e-6
+    assert abs((60.0 - dec.iloc[0]) * 3600 - 10.0) < 1e-6
 
 
 def test_build_query_filtros_server_side():

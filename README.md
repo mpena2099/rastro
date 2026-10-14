@@ -47,7 +47,7 @@ Fases sequenciais. Cada uma lê a tabela produzida pela anterior no SQLite e gra
 |------|-----------|--------|
 | 1 | **Teste de sanidade**: redescobre Luhman 16 (PM ~2,7"/ano) via CatWISE2020 + SIMBAD. Se falhar, o pipeline aborta, porque não faz sentido caçar objetos novos com uma stack que não acha os conhecidos | ✅ |
 | 2 | **Query ao CatWISE2020** (ADQL/TAP) numa região do céu, filtrando no servidor por movimento próprio, astrometria (ka=km=3) e qualidade fotométrica (SNR, flags) | ✅ |
-| 3 | **Filtragem fina de qualidade**: remove contaminação/artefatos por `cc_flags`/`ab_flags`, fontes em blend (`pmcode`, só passa A=1 e B=N), e confusão de fontes (`n_aw`) | ✅ |
+| 3 | **Filtragem fina de qualidade**: remove contaminação/artefatos por `cc_flags`/`ab_flags`, fontes em blend (`pmcode`, só passa A=1 e B=N), confusão de fontes (`n_aw`) e movimento próprio pouco significativo (PM/σ < 5) | ✅ |
 | 4 | **Cross-match contra SIMBAD** (via CDS XMatch em lote): descarta o que já é catalogado | ✅ |
 | 5 | **Triagem assistida por LLM**: prioriza os candidatos por consistência com uma anã T/Y. A LLM ordena esforço humano, **nunca dá o veredito final** | ✅ |
 | 6 | **Inspeção visual humana** (notebook com links do IRSA Finder Chart): blink de imagem, checar fantasma de difração | 🟡 template |

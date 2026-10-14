@@ -1,7 +1,7 @@
 import sqlite3
 import pandas as pd
 
-from config import SQLITE_PATH, N_AW_MAX
+from config import SQLITE_PATH, N_AW_MAX, PM_SIGNIF_MIN
 from src.proper_motion import add_pm_columns
 
 
@@ -41,7 +41,10 @@ def run():
     pmcode_good = pmcode_isolado(df["pmcode"])
     filtros.append(("pmcode A=1, B=N (fonte isolada, sem blend)", pmcode_good.sum()))
 
-    mask = f5 & cc_clean & ab_clean & pmcode_good
+    pm_signif = df["pm_signif"] >= PM_SIGNIF_MIN
+    filtros.append((f"pm_total/sigma >= {PM_SIGNIF_MIN}", pm_signif.sum()))
+
+    mask = f5 & cc_clean & ab_clean & pmcode_good & pm_signif
     filtrado = df[mask].copy()
 
     print("\nFiltros aplicados:")

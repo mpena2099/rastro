@@ -1,11 +1,26 @@
 import sqlite3
 import sys
+import numpy as np
 import pandas as pd
 from astropy.table import Table
 from astroquery.xmatch import XMatch
 import astropy.units as u
 
 from config import SQLITE_PATH, SIMBAD_RADIUS_ARCSEC, SIMBAD_DELAY_S
+
+
+MJD_J2000 = 51544.5
+
+
+def posicao_j2000(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+    # SIMBAD da coordenadas na epoca J2000; CatWISE mede em ~2015 (meanobsmjd).
+    # Sem voltar a posicao pelo PM, fonte com PM > ~0.3"/ano anda mais que o
+    # raio do match em 15 anos e escapa como "candidato" (ex: anas L conhecidas).
+    # pmra do CatWISE ja e movimento no ceu (inclui cos dec).
+    dt_anos = (df["meanobsmjd"] - MJD_J2000) / 365.25
+    dec = df["dec"] - df["pmdec"] * dt_anos / 3600.0
+    ra = df["ra"] - df["pmra"] * dt_anos / 3600.0 / np.cos(np.radians(df["dec"]))
+    return ra % 360.0, dec
 
 
 def run():
@@ -21,8 +36,9 @@ def run():
 
     t = Table()
     t["source_id"] = df["source_id"].values
-    t["ra"] = df["ra"].values
-    t["dec"] = df["dec"].values
+    ra2000, dec2000 = posicao_j2000(df)
+    t["ra"] = ra2000.values
+    t["dec"] = dec2000.values
 
     print("Enviando batch p/ CDS XMatch (SIMBAD)...")
     try:
@@ -98,12 +114,13 @@ def _fallback_sequential(df):
                     print(f"  Erro ({ra:.4f}, {dec:.4f}): {e}")
                     return None
 
+    ra2000, dec2000 = posicao_j2000(df)
     match_ids = []
     for i, row in df.iterrows():
         if i > 0 and i % 50 == 0:
             print(f"  {i}/{len(df)}...")
             sys.stdout.flush()
-        mid = query_one(row["ra"], row["dec"])
+        mid = query_one(ra2000[i], dec2000[i])
         if mid:
             match_ids.append((i, mid))
         time.sleep(SIMBAD_DELAY_S)

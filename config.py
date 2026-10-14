@@ -45,7 +45,12 @@ ROW_LIMIT = 20000
 
 # Fase 3 — quality filter
 W1SNR_MIN = 5.0
-W2SNR_MIN = 3.0
+# W2 e a banda onde ana T/Y brilha; SNR baixo aqui deixa passar deteccao no
+# nivel do ruido com PM espurio (W2SNR_MIN=3 gerava "candidatos" invisiveis no
+# unWISE). 8 corta pra ~300 fontes no campo de teste.
+W2SNR_MIN = 8.0
+# Significancia minima do movimento proprio: pm_total / sigma(pm_total).
+PM_SIGNIF_MIN = 5.0
 N_AW_MAX = 1
 
 # Fase 4 — cross-match
