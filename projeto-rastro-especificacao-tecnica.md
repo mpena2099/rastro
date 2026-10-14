@@ -148,7 +148,7 @@ Toda tabela intermediária deve manter, no mínimo, estas colunas (nomes exatos 
 | `PMRA`, `PMDec` | real (arcsec/ano) | movimento próprio nativo do catálogo |
 | `sigPMRA`, `sigPMDec` | real (arcsec/ano) | incerteza do movimento próprio |
 | `par_pm`, `par_pmSig` | real (arcsec) | estimativa crua de paralaxe e incerteza |
-| `pmcode` | char | código de qualidade da solução de movimento (formato ABCCC) |
+| `pmcode` | char | formato ABCCC: A = nº de componentes no grupo de blend, B = Y/N se um secundário substituiu o primário, CCC = distância (0.01") entre as soluções com e sem movimento |
 | `ka`, `km` | int | código de uso de astrometria/movimento (0-3; 3 = ambas as varreduras usadas) |
 | `w1flg`, `w2flg` | int | flag de qualidade da abertura padrão (0 = nominal, sem contaminação) |
 | `ab_flags` | char | bitmask de contaminação por artefato (unWISE) — ⚠️ ver §9.3 |
@@ -378,7 +378,7 @@ Objeto com:
 - W1 = {w1mpro} mag, W2 = {w2mpro} mag, cor W1-W2 = {cor_w1w2}
 - Movimento próprio total = {pm_total} arcsec/ano
 - Paralaxe estimada (par_pm) = {par_pm} arcsec (se disponível)
-- Código de qualidade da solução de movimento (pmcode) = {pmcode}
+- pmcode = {pmcode} (ABCCC: A = componentes no blend, B = troca de primário, CCC = deslocamento entre soluções)
 - Sem correspondência em SIMBAD dentro de 5 arcsec
 
 Isso é fotometricamente consistente com uma anã marrom/anã fria (tipo T ou Y)?

@@ -1,9 +1,6 @@
 from pathlib import Path
 
 ROOT = Path(__file__).parent
-DATA_RAW = ROOT / "data" / "raw"
-DATA_CANDIDATES = ROOT / "data" / "candidates"
-NOTEBOOKS = ROOT / "notebooks"
 SQLITE_PATH = ROOT / "data" / "rastro.db"
 
 CATWISE_TABLE = "catwise_2020"
@@ -24,8 +21,6 @@ SANITY_TARGETS = {
         "ra": 133.795125,
         "dec": -7.245139,
         "pm_total_ref": 8.08,
-        "pm_ra_ref": -8.05,
-        "pm_dec_ref": 0.68,
         "pm_tolerance": 2.0,
     },
     "LUHMAN_16": {
@@ -67,11 +62,10 @@ SIMBAD_DELAY_S = 0.3
 # e exporte  export GROQ_API_KEY=...  (ou adicione um provider "groq" no
 # auth.json estilo opencode). Ollama local nao precisa de chave.
 LLM_BASE_URL = "https://api.groq.com/openai/v1"
-# A cota do Groq (TPM e TPD) e POR MODELO. llama-3.3-70b-versatile e melhor mas
-# tem TPD 100k/dia; se esgotar, troque aqui pra outro modelo com cota propria
-# (ex: llama-3.1-8b-instant). Ajuste LLM_REQUEST_DELAY_S junto (TPM difere:
-# 70b=12k/min, 8b=6k/min).
-LLM_MODEL = "llama-3.1-8b-instant"
+# A cota do Groq (TPM e TPD) e POR MODELO; se esgotar, troque aqui pra outro
+# modelo com cota propria (ex: openai/gpt-oss-120b, qwen/qwen3.8-27b) e ajuste
+# LLM_REQUEST_DELAY_S ao TPM dele. Lista atual: GET {LLM_BASE_URL}/models.
+LLM_MODEL = "openai/gpt-oss-20b"
 
 # Chave da API: lida da env var abaixo; se ausente, cai no arquivo auth.json
 # (data[<provider>]["key"]). Deixe LLM_API_KEY_ENV = None p/ providers sem
@@ -81,19 +75,18 @@ LLM_API_KEY_FILE = Path.home() / ".local" / "share" / "opencode" / "auth.json"
 LLM_API_KEY_FILE_PROVIDER = "groq"
 
 # Structured output via response_format json_schema. Atencao: nem todo modelo
-# suporta. llama-3.3-70b no Groq NAO suporta (retorna 400), entao aqui fica
-# False e a Fase 5 usa o modo texto (parse do "VEREDITO:" na resposta). Modelos
-# que suportam json_schema (Gemini, gpt-oss, GLM): pode por True. Se True e o
-# modelo nao suportar, o codigo remove o param e cai pro texto (custa 1 req a mais).
-LLM_STRUCTURED = False
+# suporta (gpt-oss, Gemini e GLM suportam; os llama do Groq nao). Com False a
+# Fase 5 usa o modo texto (parse do "VEREDITO:" na resposta). Se True e o modelo
+# nao suportar, o codigo remove o param e cai pro texto (custa 1 req a mais).
+LLM_STRUCTURED = True
 LLM_TEMPERATURE = 0.3
 LLM_MAX_TOKENS = 800
 
 # Pausa entre chamadas na Fase 5, pra ficar sob o rate limit do free tier.
 # No Groq free o gargalo NAO e requisicoes/min e sim TOKENS/min (TPM). Cada
-# triagem gasta ~1.1k tokens. Ajuste ao TPM do modelo: llama-3.1-8b = 6k/min
-# -> ~12s; llama-3.3-70b = 12k/min -> ~6.5s. 0 = sem pausa.
-LLM_REQUEST_DELAY_S = 12
+# triagem gasta ~0.8k tokens. gpt-oss-20b tem TPM 8k -> ~6s minimo; 8s da
+# folga. 0 = sem pausa.
+LLM_REQUEST_DELAY_S = 8
 
 # Exemplos de outros providers (descomente e ajuste a chave):
 # Gemini:     LLM_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai"; LLM_MODEL="gemini-2.5-flash-lite"; LLM_API_KEY_ENV="GEMINI_API_KEY"; LLM_API_KEY_FILE_PROVIDER="gemini"

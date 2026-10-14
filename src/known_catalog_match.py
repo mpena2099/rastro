@@ -5,7 +5,7 @@ from astropy.table import Table
 from astroquery.xmatch import XMatch
 import astropy.units as u
 
-from config import SQLITE_PATH, SIMBAD_RADIUS_ARCSEC
+from config import SQLITE_PATH, SIMBAD_RADIUS_ARCSEC, SIMBAD_DELAY_S
 
 
 def run():
@@ -49,12 +49,10 @@ def run():
 
         match_df = result.to_pandas()
 
-        if "main_id" in match_df.columns:
-            known_ids = match_df.groupby("source_id")["main_id"].first().to_dict()
-        elif "ang_sep" in match_df.columns:
-            known_ids = match_df.loc[match_df.groupby("source_id")["ang_sep"].idxmin(), "main_id"].to_dict()
-        else:
-            known_ids = match_df.groupby("source_id").first()["main_id"].to_dict()
+        # Um source_id pode casar com varios objetos SIMBAD: fica com o mais
+        # proximo (XMatch devolve a separacao em angDist, arcsec).
+        nearest = match_df.loc[match_df.groupby("source_id")["angDist"].idxmin()]
+        known_ids = dict(zip(nearest["source_id"], nearest["main_id"]))
 
         df_result = df.copy()
         df_result["simbad_match_id"] = None
@@ -108,7 +106,7 @@ def _fallback_sequential(df):
         mid = query_one(row["ra"], row["dec"])
         if mid:
             match_ids.append((i, mid))
-        time.sleep(0.3)
+        time.sleep(SIMBAD_DELAY_S)
 
     df_result = df.copy()
     df_result["simbad_match_id"] = None

@@ -8,6 +8,7 @@ import httpx
 
 from config import (
     SQLITE_PATH,
+    SIMBAD_RADIUS_ARCSEC,
     LLM_BASE_URL,
     LLM_MODEL,
     LLM_API_KEY_ENV,
@@ -71,10 +72,10 @@ def load_api_key() -> str:
 def build_prompt(row: dict) -> str:
     return f"""Objeto com:
 - W1 = {row['w1mpro']} mag, W2 = {row['w2mpro']} mag, cor W1-W2 = {row['cor_w1w2']:.2f}
-- Movimento proprio total = {row['pm_total']:.4f} arcsec/ano
+- Movimento proprio total = {row['pm_total']:.4f} arcsec/ano (incerteza: sigpmra = {row['sigpmra']:.4f}, sigpmdec = {row['sigpmdec']:.4f} arcsec/ano)
 - Paralaxe estimada (par_pm) = {row['par_pm']} arcsec
-- Codigo de qualidade da solucao de movimento (pmcode) = {row['pmcode']}
-- Sem correspondencia em SIMBAD dentro de 5 arcsec
+- pmcode = {row['pmcode']} (formato ABCCC: A = componentes no blend, B = troca de primario, CCC = deslocamento em 0.01 arcsec entre solucao com movimento e estacionaria)
+- Sem correspondencia em SIMBAD dentro de {SIMBAD_RADIUS_ARCSEC} arcsec
 
 Isso e fotometricamente consistente com uma ana marrom/ana fria (tipo T ou Y)?
 Ou os valores sugerem mais provavelmente um artefato instrumental ou uma

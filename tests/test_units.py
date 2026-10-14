@@ -1,6 +1,6 @@
 """Testes de unidade offline (sem rede) da logica pura do pipeline.
 
-Roda de dois jeitos, a partir de rastro/:
+Roda de dois jeitos, a partir da raiz do repo:
     python tests/test_units.py       # runner embutido, sem dependencia
     python -m pytest tests/          # se pytest estiver instalado
 
@@ -20,6 +20,7 @@ import pandas as pd
 from src.proper_motion import add_pm_columns
 from src.llm_triage import parse_score, interpret_response
 from src.fetch_field import build_query
+from src.quality_filter import pmcode_isolado
 import config
 
 
@@ -59,6 +60,12 @@ def test_interpret_response_none_e_texto():
     assert interpret_response(None) == ("", "media")
     notes, score = interpret_response("analise...\nVEREDITO: incerta")
     assert score == "incerta"
+
+
+def test_pmcode_isolado():
+    # ABCCC: A = componentes no blend, B = troca de primario. So A=1,B=N passa.
+    s = pd.Series(["1N000", "1N013", "2N000", "3N001", "1Y000", None, ""])
+    assert pmcode_isolado(s).tolist() == [True, True, False, False, False, False, False]
 
 
 def test_build_query_filtros_server_side():

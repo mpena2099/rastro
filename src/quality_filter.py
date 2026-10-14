@@ -1,8 +1,17 @@
 import sqlite3
 import pandas as pd
 
-from config import SQLITE_PATH, W1SNR_MIN, W2SNR_MIN, N_AW_MAX
+from config import SQLITE_PATH, N_AW_MAX
 from src.proper_motion import add_pm_columns
+
+
+def pmcode_isolado(pmcode: pd.Series) -> pd.Series:
+    # pmcode = ABCCC (spec de colunas CatWISE2020): A = n de componentes no grupo
+    # de blend passivo, B = 'Y' se um secundario substituiu o primario, CCC =
+    # distancia entre as solucoes com e sem movimento. NAO e nota de qualidade:
+    # A>1 e blend, que gera PM espurio. Mantem so fonte isolada sem troca.
+    s = pmcode.fillna("").astype(str)
+    return (s.str[0] == "1") & (s.str[1] == "N")
 
 
 def run():
@@ -19,18 +28,7 @@ def run():
 
     filtros = []
 
-    f1 = df["w1flg"] < 8
-    filtros.append(("w1flg < 8 (exclui corrompido/saturado/limite)", f1.sum()))
-
-    f2 = df["w2flg"] < 8
-    filtros.append(("w2flg < 8 (exclui corrompido/saturado/limite)", f2.sum()))
-
-    f3 = df["w1snr"] >= W1SNR_MIN
-    filtros.append((f"w1snr >= {W1SNR_MIN}", f3.sum()))
-
-    f4 = df["w2snr"] >= W2SNR_MIN
-    filtros.append((f"w2snr >= {W2SNR_MIN}", f4.sum()))
-
+    # w1flg/w2flg/SNR ja sao cortados no servidor na Fase 2
     f5 = df["n_aw"] <= N_AW_MAX
     filtros.append((f"n_aw <= {N_AW_MAX}", f5.sum()))
 
@@ -40,10 +38,10 @@ def run():
     ab_clean = df["ab_flags"] == "00"
     filtros.append(("ab_flags == '00' (sem artefato)", ab_clean.sum()))
 
-    pmcode_good = df["pmcode"].str[0].astype(int) >= 2
-    filtros.append(("pmcode com qualidade >= 2 (bom/excelente)", pmcode_good.sum()))
+    pmcode_good = pmcode_isolado(df["pmcode"])
+    filtros.append(("pmcode A=1, B=N (fonte isolada, sem blend)", pmcode_good.sum()))
 
-    mask = f1 & f2 & f3 & f4 & f5 & cc_clean & ab_clean & pmcode_good
+    mask = f5 & cc_clean & ab_clean & pmcode_good
     filtrado = df[mask].copy()
 
     print("\nFiltros aplicados:")

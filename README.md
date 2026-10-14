@@ -22,7 +22,7 @@ O CatWISE2020 é um **catálogo tabular**: uma tabela gigante com ~1,89 bilhão 
 | `w1mpro`, `w2mpro` | brilho nas bandas infravermelhas W1 (3,4 µm) e W2 (4,6 µm), em magnitudes |
 | `w1snr`, `w2snr` | razão sinal-ruído da medida em cada banda |
 | `pmra`, `pmdec` | **movimento próprio** já calculado pelo catálogo (arcsec/ano) |
-| `pmcode`, `ka`, `km` | qualidade da solução de movimento e astrometria |
+| `pmcode`, `ka`, `km` | blend da fonte (`pmcode` = ABCCC, A = nº de componentes) e uso de astrometria/movimento |
 | `w1flg`, `w2flg`, `cc_flags`, `ab_flags`, `n_aw` | flags de qualidade/contaminação (artefato, confusão de fontes) |
 
 Ou seja, o pipeline **não processa imagens FITS**: ele consulta e filtra linhas dessa tabela. A Fase 2 é literalmente uma query `SELECT ... WHERE ...` (em **ADQL**, uma linguagem tipo SQL) rodada no servidor do IRSA via **TAP**, um protocolo de consulta a catálogos astronômicos. Cada "candidato" que avança pelas fases é uma **linha** dessa tabela.
@@ -47,7 +47,7 @@ Fases sequenciais. Cada uma lê a tabela produzida pela anterior no SQLite e gra
 |------|-----------|--------|
 | 1 | **Teste de sanidade**: redescobre Luhman 16 (PM ~2,7"/ano) via CatWISE2020 + SIMBAD. Se falhar, o pipeline aborta, porque não faz sentido caçar objetos novos com uma stack que não acha os conhecidos | ✅ |
 | 2 | **Query ao CatWISE2020** (ADQL/TAP) numa região do céu, filtrando no servidor por movimento próprio, astrometria (ka=km=3) e qualidade fotométrica (SNR, flags) | ✅ |
-| 3 | **Filtragem fina de qualidade**: remove contaminação/artefatos por `cc_flags`/`ab_flags`, qualidade do movimento (`pmcode`), e confusão de fontes (`n_aw`) | ✅ |
+| 3 | **Filtragem fina de qualidade**: remove contaminação/artefatos por `cc_flags`/`ab_flags`, fontes em blend (`pmcode`, só passa A=1 e B=N), e confusão de fontes (`n_aw`) | ✅ |
 | 4 | **Cross-match contra SIMBAD** (via CDS XMatch em lote): descarta o que já é catalogado | ✅ |
 | 5 | **Triagem assistida por LLM**: prioriza os candidatos por consistência com uma anã T/Y. A LLM ordena esforço humano, **nunca dá o veredito final** | ✅ |
 | 6 | **Inspeção visual humana** (notebook com links do IRSA Finder Chart): blink de imagem, checar fantasma de difração | 🟡 template |
@@ -101,7 +101,7 @@ Não há mocks das APIs externas (IRSA/SIMBAD/LLM): a filosofia aqui é validar 
 
 É **provider-agnóstico**: fala o formato OpenAI (`/chat/completions`) via `httpx`, sem SDK. Trocar de provider é só mudar três coisas em `config.py`: `LLM_BASE_URL`, `LLM_MODEL` e de onde vem a chave. Há exemplos comentados pra Gemini, OpenRouter, Zhipu e Ollama.
 
-- **Default: Groq free** (`llama-3.1-8b-instant`). Chave grátis, sem cartão, em [console.groq.com](https://console.groq.com). Cota (tokens/min e tokens/dia) é **por modelo**, então dá pra alternar de modelo se um esgotar.
+- **Default: Groq free** (`openai/gpt-oss-20b`, com saída estruturada em JSON). Chave grátis, sem cartão, em [console.groq.com](https://console.groq.com). Cota (tokens/min e tokens/dia) é **por modelo**, então dá pra alternar de modelo se um esgotar.
 - **Alternativa sem cota diária** (pra iterar bastante): **Zhipu GLM-4.7-Flash**, perpetuamente free (exemplo pronto no `config.py`).
 - **Zero cota / offline**: Ollama local.
 

@@ -22,7 +22,7 @@ def simbad_query_retry(coord: SkyCoord, radius: u.Quantity, retries: int = 3, de
     return None
 
 
-def resolve_via_simbad(ra: float, dec: float, name: str) -> dict | None:
+def resolve_via_simbad(ra: float, dec: float) -> dict | None:
     coord = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame="icrs")
     result = simbad_query_retry(coord, 120 * u.arcsec)
     if result is None:
@@ -34,8 +34,8 @@ def resolve_via_simbad(ra: float, dec: float, name: str) -> dict | None:
     return None
 
 
-def check_target(name: str, params: dict, is_primary: bool = False) -> dict:
-    simbad_info = resolve_via_simbad(params["ra"], params["dec"], name)
+def check_target(name: str, params: dict) -> dict:
+    simbad_info = resolve_via_simbad(params["ra"], params["dec"])
 
     if simbad_info:
         target_ra = simbad_info["ra"]
@@ -85,7 +85,7 @@ def run():
         is_primary = name == "LUHMAN_16"
         print(f"\n--- {name} ---")
         try:
-            result = check_target(name, params, is_primary)
+            result = check_target(name, params)
         except Exception as e:
             print(f"  ERRO: {e}")
             if is_primary:
@@ -106,15 +106,19 @@ def run():
             print(f"    PM={src['pm_total']:.4f}\"/yr  W1={src['w1mpro']:.2f}  "
                   f"W2={src['w2mpro']:.2f}  id={src['source_id']}")
 
-        if is_primary and params["pm_total_ref"] is not None:
+        # Todo alvo com referencia e checado; so o primario (Luhman 16) aborta.
+        # Os demais (ex: WISE 0855, so W2, fraco) viram aviso.
+        if params.get("pm_total_ref") is not None:
             top_pm = result["top_by_pm"][0]["pm_total"]
             ref = params["pm_total_ref"]
             tol = params["pm_tolerance"]
             if abs(top_pm - ref) <= tol:
                 print(f"  ✓ PM {top_pm:.4f} compativel c/ ref {ref} ±{tol}")
-            else:
+            elif is_primary:
                 print(f"  ✗ PM {top_pm:.4f} fora de ref {ref} ±{tol}")
                 all_ok = False
+            else:
+                print(f"  ! PM {top_pm:.4f} fora de ref {ref} ±{tol} (aviso, nao aborta)")
 
     print("\n" + "=" * 50)
     if all_ok:
