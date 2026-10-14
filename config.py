@@ -84,7 +84,9 @@ LLM_API_KEY_FILE_PROVIDER = "groq"
 # Fase 5 usa o modo texto (parse do "VEREDITO:" na resposta). Se True e o modelo
 # nao suportar, o codigo remove o param e cai pro texto (custa 1 req a mais).
 LLM_STRUCTURED = True
-LLM_TEMPERATURE = 0.3
+# 0 reduz a variacao mas nao zera: no Groq o gpt-oss-20b ainda muda o score de
+# ~1/3 dos candidatos entre rodadas. Trate o score como prioridade, nao veredito.
+LLM_TEMPERATURE = 0
 LLM_MAX_TOKENS = 800
 
 # Pausa entre chamadas na Fase 5, pra ficar sob o rate limit do free tier.

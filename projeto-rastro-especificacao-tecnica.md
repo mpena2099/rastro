@@ -381,7 +381,7 @@ Objeto com:
 - pmcode = {pmcode} (ABCCC: A = componentes no blend, B = troca de primário, CCC = deslocamento entre soluções)
 - Sem correspondência em SIMBAD dentro de 5 arcsec
 
-Isso é fotometricamente consistente com uma anã marrom/anã fria (tipo T ou Y)?
+Isso é fotometricamente consistente com uma anã marrom/anã fria (tipo L, T ou Y)?
 Ou os valores sugerem mais provavelmente um artefato instrumental ou uma
 estrela de fundo comum mal medida? Responda com o raciocínio, não só a
 conclusão. Se a evidência for insuficiente pra opinar, diga isso

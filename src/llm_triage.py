@@ -77,7 +77,8 @@ def build_prompt(row: dict) -> str:
 - pmcode = {row['pmcode']} (formato ABCCC: A = componentes no blend, B = troca de primario, CCC = deslocamento em 0.01 arcsec entre solucao com movimento e estacionaria)
 - Sem correspondencia em SIMBAD dentro de {SIMBAD_RADIUS_ARCSEC} arcsec
 
-Isso e fotometricamente consistente com uma ana marrom/ana fria (tipo T ou Y)?
+Isso e fotometricamente consistente com uma ana marrom/ana fria (tipo L, T ou Y)?
+Referencia aproximada de W1-W2: L ~0.2-0.7, T ~0.5-3, Y > ~3 (estrelas comuns ~0).
 Ou os valores sugerem mais provavelmente um artefato instrumental ou uma
 estrela de fundo comum mal medida?
 """ + (_STRUCTURED_INSTRUCTION if LLM_STRUCTURED else _TEXT_INSTRUCTION)
