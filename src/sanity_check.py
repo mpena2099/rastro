@@ -9,17 +9,21 @@ from config import SANITY_TARGETS, CATWISE_TABLE
 from src.proper_motion import add_pm_columns
 
 
-def simbad_query_retry(coord: SkyCoord, radius: u.Quantity, retries: int = 3, delay: float = 2.0):
+def _retry(fn, servico: str, retries: int = 3, delay: float = 5.0):
     for attempt in range(retries):
         try:
-            return Simbad.query_region(coord, radius=radius)
+            return fn()
         except Exception as e:
             if attempt < retries - 1:
-                print(f"  SIMBAD retry {attempt+1}/{retries}: {e}")
+                print(f"  {servico} retry {attempt+1}/{retries}: {e}")
                 time.sleep(delay)
             else:
                 raise
     return None
+
+
+def simbad_query_retry(coord: SkyCoord, radius: u.Quantity):
+    return _retry(lambda: Simbad.query_region(coord, radius=radius), "SIMBAD")
 
 
 def resolve_via_simbad(ra: float, dec: float) -> dict | None:
@@ -35,25 +39,21 @@ def resolve_via_simbad(ra: float, dec: float) -> dict | None:
 
 
 def check_target(name: str, params: dict) -> dict:
+    # SIMBAD so identifica o objeto. O cone fica nas coordenadas do config (epoca
+    # CatWISE): a posicao do SIMBAD e J2000 e WISE 0855 anda ~125" ate 2015,
+    # o que joga a fonte certa pra fora do cone de 120".
     simbad_info = resolve_via_simbad(params["ra"], params["dec"])
 
-    if simbad_info:
-        target_ra = simbad_info["ra"]
-        target_dec = simbad_info["dec"]
-    else:
-        target_ra = params["ra"]
-        target_dec = params["dec"]
+    coord = SkyCoord(ra=params["ra"] * u.deg, dec=params["dec"] * u.deg, frame="icrs")
 
-    coord = SkyCoord(ra=target_ra * u.deg, dec=target_dec * u.deg, frame="icrs")
-
-    result = Irsa.query_region(
+    result = _retry(lambda: Irsa.query_region(
         coord,
         catalog=CATWISE_TABLE,
         spatial="Cone",
         radius=120 * u.arcsec,
         columns="source_id,ra,dec,w1mpro,w2mpro,w1snr,w2snr,"
         "pmra,pmdec,sigpmra,sigpmdec,par_pm,pmcode,ka,km",
-    )
+    ), "IRSA")
 
     if result is None or len(result) == 0:
         return {"target": name, "found": False, "sources": 0}
@@ -66,8 +66,8 @@ def check_target(name: str, params: dict) -> dict:
         "target": name,
         "found": True,
         "simbad_id": simbad_info["main_id"] if simbad_info else None,
-        "simbad_ra": target_ra,
-        "simbad_dec": target_dec,
+        "simbad_ra": simbad_info["ra"] if simbad_info else None,
+        "simbad_dec": simbad_info["dec"] if simbad_info else None,
         "sources": len(df),
         "top_by_pm": df.head(5).to_dict("records"),
     }
