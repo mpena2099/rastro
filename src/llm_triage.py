@@ -17,6 +17,7 @@ from config import (
     LLM_STRUCTURED,
     LLM_TEMPERATURE,
     LLM_MAX_TOKENS,
+    LLM_REASONING_EFFORT,
     LLM_REQUEST_DELAY_S,
     LLM_BATCH_SIZE,
 )
@@ -110,6 +111,8 @@ def call_llm(prompt: str, api_key: str, max_retries: int = 5) -> tuple[str, str]
         "temperature": LLM_TEMPERATURE,
         "max_tokens": LLM_MAX_TOKENS,
     }
+    if LLM_REASONING_EFFORT:
+        payload["reasoning_effort"] = LLM_REASONING_EFFORT
     if LLM_STRUCTURED:
         payload["response_format"] = TRIAGE_SCHEMA
 
@@ -149,6 +152,11 @@ def call_llm(prompt: str, api_key: str, max_retries: int = 5) -> tuple[str, str]
         resp.raise_for_status()
         data = resp.json()
         content = data["choices"][0]["message"]["content"]
+        if not content or not content.strip():
+            # Sem texto nao ha analise: nao deixa virar "media" por padrao.
+            raise RuntimeError(
+                "resposta vazia do modelo (raciocinio provavelmente consumiu "
+                "LLM_MAX_TOKENS); aumente LLM_MAX_TOKENS ou reduza o esforco")
         return interpret_response(content)
 
     resp.raise_for_status()  # esgotou retries: propaga o ultimo erro
@@ -224,7 +232,7 @@ def run():
     api_key = load_api_key()
     print(f"Provider: {LLM_BASE_URL}")
     print(f"Modelo: {LLM_MODEL}")
-    print(f"API key: {(api_key[:12] + '...') if api_key else '(sem chave)'}")
+    print(f"API key: {('...' + api_key[-4:]) if api_key else '(sem chave)'}")
 
     conn = sqlite3.connect(str(SQLITE_PATH))
     df = pd.read_sql("SELECT * FROM candidatos_fase4 WHERE status = 'candidato'", conn)

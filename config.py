@@ -79,15 +79,21 @@ LLM_API_KEY_ENV = "GROQ_API_KEY"
 LLM_API_KEY_FILE = Path.home() / ".local" / "share" / "opencode" / "auth.json"
 LLM_API_KEY_FILE_PROVIDER = "groq"
 
-# Structured output via response_format json_schema. Atencao: nem todo modelo
-# suporta (gpt-oss, Gemini e GLM suportam; os llama do Groq nao). Com False a
-# Fase 5 usa o modo texto (parse do "VEREDITO:" na resposta). Se True e o modelo
-# nao suportar, o codigo remove o param e cai pro texto (custa 1 req a mais).
-LLM_STRUCTURED = True
+# Structured output via response_format json_schema. No Groq o gpt-oss-20b
+# aceita o param, mas devolve 400 json_validate_failed em ~44% das chamadas
+# (mesmo com max_tokens alto), entao aqui fica False e a Fase 5 usa o modo texto
+# (parse do "VEREDITO:" na resposta), que deu 9/9 ok. Com True e modelo que nao
+# suporta, o codigo remove o param e cai pro texto (custa 1 req a mais).
+LLM_STRUCTURED = False
 # 0 reduz a variacao mas nao zera: no Groq o gpt-oss-20b ainda muda o score de
 # ~1/3 dos candidatos entre rodadas. Trate o score como prioridade, nao veredito.
 LLM_TEMPERATURE = 0
-LLM_MAX_TOKENS = 800
+LLM_MAX_TOKENS = 1500
+# Esforco de raciocinio de modelos gpt-oss (low|medium|high). "low" corta pela
+# metade os tokens por chamada e evita o raciocinio consumir o max_tokens e
+# devolver resposta vazia. None = nao envia o param (use em providers que o
+# rejeitam, como Ollama ou Gemini).
+LLM_REASONING_EFFORT = "low"
 
 # Pausa entre chamadas na Fase 5, pra ficar sob o rate limit do free tier.
 # No Groq free o gargalo NAO e requisicoes/min e sim TOKENS/min (TPM). Cada

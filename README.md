@@ -103,13 +103,13 @@ Não há mocks das APIs externas (IRSA/SIMBAD/LLM): a filosofia aqui é validar 
 
 É **provider-agnóstico**: fala o formato OpenAI (`/chat/completions`) via `httpx`, sem SDK. Trocar de provider é só mudar três coisas em `config.py`: `LLM_BASE_URL`, `LLM_MODEL` e de onde vem a chave. Há exemplos comentados pra Gemini, OpenRouter, Zhipu e Ollama.
 
-- **Default: Groq free** (`openai/gpt-oss-20b`, com saída estruturada em JSON). Chave grátis, sem cartão, em [console.groq.com](https://console.groq.com). Cota (tokens/min e tokens/dia) é **por modelo**, então dá pra alternar de modelo se um esgotar.
+- **Default: Groq free** (`openai/gpt-oss-20b`, modo texto com `reasoning_effort` baixo). Chave grátis, sem cartão, em [console.groq.com](https://console.groq.com). Cota (tokens/min e tokens/dia) é **por modelo**, então dá pra alternar de modelo se um esgotar.
 - **Alternativa sem cota diária** (pra iterar bastante): **Zhipu GLM-4.7-Flash**, perpetuamente free (exemplo pronto no `config.py`).
 - **Zero cota / offline**: Ollama local.
 
 A chave é resolvida por `load_api_key()`: primeiro a env var (ex: `GROQ_API_KEY`), senão o arquivo `~/.local/share/opencode/auth.json` (campo `<provider>.key`).
 
-Quando o modelo suporta, a triagem usa **saída estruturada** (`response_format` json_schema). Quando não suporta, cai automaticamente no modo texto e lê o veredito da resposta. Regra do score: **`alta` só sai de um veredito explícito do modelo**; heurística por palavra-chave só rebaixa, nunca promove, pra não gerar falso positivo.
+A triagem pode usar **saída estruturada** (`response_format` json_schema, `LLM_STRUCTURED=True`), mas o default é o modo texto: o `gpt-oss-20b` no Groq falha o JSON em boa parte das chamadas. Se o modelo rejeitar o formato, cai no modo texto e lê o veredito da resposta. Resposta vazia vira `erro`, nunca um score. Regra do score: **`alta` só sai de um veredito explícito do modelo**; heurística por palavra-chave só rebaixa, nunca promove, pra não gerar falso positivo.
 
 ## Dados
 
