@@ -20,7 +20,7 @@ import streamlit as st
 from PIL import Image, ImageDraw
 
 from app import dados
-from config import SQLITE_PATH
+from config import ROOT, SQLITE_PATH
 
 CAMADAS = [
     ("unwise-neo2", "unWISE NEO2 (infravermelho)"),
@@ -213,6 +213,26 @@ with st.expander("Como decidir (o que procurar nas imagens)"):
 - **Confirmar** não é descoberta: quer dizer "passa no olho". O teste decisivo é abrir o link do WiseView e ver o ponto andando sempre na mesma direção ao longo dos anos. Quem não anda é ruído.
 - **Descartar** não apaga nada: a decisão fica gravada com a nota e dá pra rever no filtro "Situação".
 """)
+
+with st.expander("Casos de referência (como são os confirmar, dúvida e descartar)"):
+    abas = st.tabs(["Confirmar", "Dúvida", "Descartar"])
+    textos = {
+        "confirmar": """Em cada linha: unWISE NEO2, unWISE NEO7 e óptico (Legacy Surveys). As três primeiras linhas desta folha são exemplos de **confirmar**.
+
+1. **Anã L5 conhecida.** Bolha nítida no infravermelho e um ponto vermelho no óptico, os dois na mira.
+2. **Anã T7 conhecida.** Bolha alaranjada no infravermelho, na borda da mira (o objeto andou desde 2015) e nada no óptico naquela posição. O ponto vermelho à direita, no óptico, é outra fonte.
+3. **Suspeito do campo.** Bolha nítida no infravermelho e um pontinho vermelho exatamente na mira (cor W1-W2 0,56). É o tipo de caso que vale levar ao WiseView.""",
+        "duvida": """1. **Anã Y0 conhecida.** Um borrão marrom fraquíssimo no infravermelho, nada no óptico, vizinhas brilhantes por perto. **Uma anã Y real parece isso.**
+2. **Três suspeitos do campo** com a mesma cara: fraco no infravermelho, nada no óptico. Sem ver o movimento no WiseView não dá pra distingui-los de ruído, e é por isso que o certo é **dúvida** (e não descartar).""",
+        "descartar": """1. **Nada no infravermelho.** Só um rastro difuso e sem forma, sem a bolha compacta de um objeto real.
+2. **Estrela clara no óptico.** Ponto brilhante, com núcleo estourado, bem na mira.
+3. **Galáxia.** No óptico aparece uma galáxia grande e amarela, com estrutura.
+4. **Estrela brilhante e saturada.** O "estouro" azul-lilás é típico de estrela forte demais pra câmera.""",
+    }
+    for aba, chave in zip(abas, ("confirmar", "duvida", "descartar")):
+        with aba:
+            st.image(str(ROOT / "docs" / "img" / f"ref_{chave}.jpg"))
+            st.markdown(textos[chave])
 
 st.subheader("Sua decisão")
 if r["decisao"] != "pendente":
