@@ -23,7 +23,7 @@ Pipeline pessoal de mineração de dados astronômicos que caça **anãs marrons
 **O que o programa faz, passo a passo.** Pense numa peneira com várias malhas, cada uma deixando passar menos gente:
 
 1. **Confere as ferramentas.** Procura dois objetos famosos que já se conhece. Se não os achar, algo está errado e o programa para.
-2. **Baixa um pedaço do céu.** Hoje, uma área de 1 grau por 1 grau (cerca de 5 vezes a Lua cheia), só com pontos que se movem rápido.
+2. **Baixa um pedaço do céu.** Hoje, 25 graus quadrados (quadrados de 1 grau por 1 grau, cada um com cerca de 5 vezes a área da Lua cheia), só com pontos que se movem rápido.
 3. **Joga fora medidas duvidosas.** Defeitos do instrumento, pontos colados em vizinhos e movimentos pequenos demais pra distinguir de erro de medida.
 4. **Joga fora o que já é conhecido.** Compara com o SIMBAD, o grande cadastro de objetos astronômicos.
 5. **Pede a nota de uma IA.** Uma IA lê os números de cada sobrevivente e dá uma nota de prioridade. Ela só ajuda a ordenar, nunca decide.
@@ -32,7 +32,7 @@ Pipeline pessoal de mineração de dados astronômicos que caça **anãs marrons
 
 ![Quantas fontes sobram em cada fase](docs/img/funil_fases.png)
 
-**O que esperar:** quase tudo que passa pela peneira é falso alarme ou já era conhecido, e isso é normal até em projetos profissionais. No campo de teste, o programa reencontrou sozinho uma anã marrom que já estava catalogada, sinal de que os filtros funcionam. Os candidatos que sobraram parecem falsos alarmes. Uma descoberta nova é o horizonte, não a promessa.
+**O que esperar:** quase tudo que passa pela peneira é falso alarme ou já era conhecido, e isso é normal até em projetos profissionais. No campo de teste, o programa reencontrou sozinho uma anã marrom que já estava catalogada, sinal de que os filtros funcionam. Na varredura de 25 graus quadrados sobraram 239 candidatos, e ainda não há lista curta e defensável: falta a confirmação visual. Uma descoberta nova é o horizonte, não a promessa.
 
 ## O que entra, o que sai e o que fazer com isso
 
@@ -98,12 +98,14 @@ Fases sequenciais. Cada uma lê a tabela produzida pela anterior no SQLite e gra
 | Fase | O que faz | Status |
 |------|-----------|--------|
 | 1 | **Teste de sanidade**: redescobre Luhman 16 (PM ~2,7"/ano) e WISE 0855 (PM ~8"/ano) via CatWISE2020 + SIMBAD. Se Luhman 16 falhar, o pipeline aborta, porque não faz sentido caçar objetos novos com uma stack que não acha os conhecidos. WISE 0855 só gera aviso | ✅ |
-| 2 | **Query ao CatWISE2020** (ADQL/TAP) numa região do céu, filtrando no servidor por movimento próprio, astrometria (ka=km=3) e qualidade fotométrica (SNR, flags) | ✅ |
-| 3 | **Filtragem fina de qualidade**: remove contaminação/artefatos por `cc_flags`/`ab_flags`, fontes em blend (`pmcode`, só passa A=1 e B=N), confusão de fontes (`n_aw`) e movimento próprio pouco significativo (PM/σ < 5) | ✅ |
+| 2 | **Query ao CatWISE2020** (ADQL/TAP) numa região do céu, varrida em ladrilhos de 1 grau (um ladrilho que estoura o limite de linhas é dividido em 4), filtrando no servidor por movimento próprio, astrometria (ka=km=3) e qualidade de W2 (SNR e flag). Sem corte em W1: anãs Y são fracas nessa banda | ✅ |
+| 3 | **Filtragem fina de qualidade**: remove contaminação/artefatos por `cc_flags`/`ab_flags`, troca do componente principal (`pmcode` B=N), confusão de fontes (`n_aw`) e movimento próprio pouco significativo (PM/σ < 8) | ✅ |
 | 4 | **Cross-match contra SIMBAD** (via CDS XMatch em lote): descarta o que já é catalogado. O SIMBAD usa posições em J2000 e o CatWISE mede em ~2015, então a posição é recuada pelo movimento próprio antes do match. Sem isso, fontes com PM acima de ~0,3"/ano escapam como "novas" | ✅ |
 | 5 | **Triagem assistida por LLM**: prioriza os candidatos por consistência com uma anã L, T ou Y. A LLM ordena esforço humano, **nunca dá o veredito final**. O score varia entre rodadas (cerca de 1/3 dos candidatos mudam), então vale só como prioridade | ✅ |
 | 6 | **Inspeção visual humana** (notebook com links do IRSA Finder Chart): blink de imagem, checar fantasma de difração | 🟡 template |
 | 7 | **Segunda opinião** com astrônomo | ⬜ |
+
+**Quanto os cortes deixam passar.** Os limiares foram medidos contra 949 anãs L/T/Y já conhecidas (`python tools/recall_conhecidas.py`, usa rede, ~8 min). Com os cortes atuais passam **76%** delas (L 80%, T 70%, Y 77%). Duas medições mudaram o desenho: filtrar o primeiro dígito do `pmcode` (A=1) derrubava o recall de 76% pra 25%, porque ele mede vizinhança e não qualidade; e cortar por SNR em W1 perdia metade das anãs Y. As conhecidas são as mais brilhantes, então o recall pra anãs ainda não descobertas tende a ser menor.
 
 ## Como usar
 
@@ -184,6 +186,8 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
 │   ├── known_catalog_match.py # Fase 4
 │   ├── llm_triage.py        # Fase 5
 │   └── proper_motion.py     # util (pm_total, cor_w1w2)
+├── tools/
+│   └── recall_conhecidas.py # mede o recall dos cortes contra anas conhecidas
 ├── tests/
 │   └── test_units.py        # testes de unidade offline
 ├── docs/img/                # figuras usadas neste README

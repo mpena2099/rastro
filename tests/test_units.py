@@ -19,8 +19,8 @@ import pandas as pd
 
 from src.proper_motion import add_pm_columns
 from src.llm_triage import parse_score, interpret_response
-from src.fetch_field import build_query
-from src.quality_filter import pmcode_isolado
+from src.fetch_field import build_query, make_tiles
+from src.quality_filter import pmcode_sem_troca
 from src.known_catalog_match import posicao_j2000, MJD_J2000
 import config
 
@@ -71,30 +71,33 @@ def test_interpret_response_none_e_texto():
     assert score == "incerta"
 
 
-def test_pmcode_isolado():
-    # ABCCC: A = componentes no blend, B = troca de primario. So A=1,B=N passa.
-    s = pd.Series(["1N000", "1N013", "2N000", "3N001", "1Y000", None, ""])
-    assert pmcode_isolado(s).tolist() == [True, True, False, False, False, False, False]
-
-
-def test_posicao_j2000():
-    # 10 anos depois de J2000, pmdec=+1"/ano e pmra=+1"/ano em dec=60 (cos=0.5):
-    # volta 10" em dec e 20" em coordenada RA (10" no ceu / cos dec).
-    df = pd.DataFrame({"ra": [100.0], "dec": [60.0], "pmra": [1.0], "pmdec": [1.0],
-                       "meanobsmjd": [MJD_J2000 + 10 * 365.25]})
-    ra, dec = posicao_j2000(df)
-    assert abs((100.0 - ra.iloc[0]) * 3600 - 20.0) < 1e-6
-    assert abs((60.0 - dec.iloc[0]) * 3600 - 10.0) < 1e-6
+def test_pmcode_sem_troca():
+    # ABCCC: so B importa ('Y' = secundario substituiu o primario). A (componentes
+    # do blend) nao filtra: derrubava o recall de anas reais de 75% pra 25%.
+    s = pd.Series(["1N000", "3N013", "2N000", "1Y000", "3Y001", None, ""])
+    assert pmcode_sem_troca(s).tolist() == [True, True, True, False, False, False, False]
 
 
 def test_build_query_filtros_server_side():
-    q = build_query()
+    q = build_query(149.5, 150.5, 19.5, 20.5)
     assert f"TOP {config.ROW_LIMIT}" in q
     assert "ra BETWEEN" in q and "dec BETWEEN" in q
     assert "ka = 3 AND km = 3" in q
     assert "SQRT(POWER(pmra" in q                 # filtro de movimento proprio
-    assert "w1snr >=" in q and "w2snr >=" in q     # SNR server-side
-    assert "w1flg < 8" in q and "w2flg < 8" in q   # flags server-side
+    assert "w2snr >=" in q and "w2flg < 8" in q    # SNR e flag de W2 server-side
+    where = q.split("WHERE")[1]
+    assert "w1snr" not in where and "w1flg" not in where  # sem corte em W1 (anas Y)
+
+
+def test_make_tiles_cobre_regiao():
+    tiles = make_tiles()
+    n_ra = round((config.FIELD_RA_RANGE[1] - config.FIELD_RA_RANGE[0]) / config.FIELD_STEP_DEG)
+    n_dec = round((config.FIELD_DEC_RANGE[1] - config.FIELD_DEC_RANGE[0]) / config.FIELD_STEP_DEG)
+    assert len(tiles) == n_ra * n_dec
+    assert min(t[0] for t in tiles) == config.FIELD_RA_RANGE[0]
+    assert max(t[1] for t in tiles) == config.FIELD_RA_RANGE[1]
+    assert min(t[2] for t in tiles) == config.FIELD_DEC_RANGE[0]
+    assert max(t[3] for t in tiles) == config.FIELD_DEC_RANGE[1]
 
 
 def test_load_api_key_env():

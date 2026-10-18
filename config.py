@@ -32,25 +32,28 @@ SANITY_TARGETS = {
 }
 
 # Fase 2 — field query
-FIELD_RA_MIN = 149.5
-FIELD_RA_MAX = 150.5
-FIELD_DEC_MIN = 19.5
-FIELD_DEC_MAX = 20.5
+# A regiao e varrida em ladrilhos quadrados de FIELD_STEP_DEG graus (em RA/Dec,
+# sem cruzar RA=0/360). O default cobre 25 graus quadrados em alta latitude
+# galactica (b ~ +50), onde ha pouca confusao de fontes.
+FIELD_RA_RANGE = (148.0, 153.0)
+FIELD_DEC_RANGE = (18.0, 23.0)
+FIELD_STEP_DEG = 1.0
 PM_THRESHOLD_ARCSEC = 0.15
-# Teto de linhas do TOP na Fase 2. Alto de proposito: serve so de guarda contra
-# runaway, nao pra "caber" o campo. Com os filtros server-side (PM + SNR + flags)
-# o campo 1x1 volta ~4.6k fontes completo; se bater ROW_LIMIT, a Fase 2 aborta
-# avisando de truncagem em vez de seguir com meio campo.
+# Teto de linhas do TOP por consulta na Fase 2. Alto de proposito: serve so de
+# guarda contra truncagem. Se um ladrilho bater o teto, ele e dividido em 4 e
+# refeito, em vez de seguir com meio ladrilho.
 ROW_LIMIT = 20000
 
 # Fase 3 — quality filter
-W1SNR_MIN = 5.0
 # W2 e a banda onde ana T/Y brilha; SNR baixo aqui deixa passar deteccao no
 # nivel do ruido com PM espurio (W2SNR_MIN=3 gerava "candidatos" invisiveis no
 # unWISE). 8 corta pra ~300 fontes no campo de teste.
 W2SNR_MIN = 8.0
-# Significancia minima do movimento proprio: pm_total / sigma(pm_total).
-PM_SIGNIF_MIN = 5.0
+# Significancia minima do movimento proprio: pm_total / sigma(pm_total). Medido
+# contra 772 anas L/T/Y conhecidas: 5 mantem 96% mas deixava 1370 candidatos em
+# 25 graus quadrados (mediana 5.97, colados no corte); 8 mantem 94% e deixa 239;
+# 10 mantem 91% e deixa 118.
+PM_SIGNIF_MIN = 8.0
 N_AW_MAX = 1
 
 # Fase 4 — cross-match
@@ -106,4 +109,8 @@ LLM_REQUEST_DELAY_S = 8
 # OpenRouter: LLM_BASE_URL="https://openrouter.ai/api/v1"; LLM_MODEL="openai/gpt-oss-20b:free"; LLM_API_KEY_FILE_PROVIDER="openrouter"
 # Zhipu:      LLM_BASE_URL="https://api.z.ai/api/paas/v4"; LLM_MODEL="glm-4.7-flash"; LLM_API_KEY_ENV="ZHIPU_API_KEY"; LLM_API_KEY_FILE_PROVIDER="zhipu"
 # Ollama:     LLM_BASE_URL="http://localhost:11434/v1"; LLM_MODEL="qwen2.5:7b"; LLM_API_KEY_ENV=None
-LLM_BATCH_SIZE = 30
+# Teto de candidatos triados (os de maior PM primeiro). A cota diaria do Groq
+# (gpt-oss-20b: 200k tokens/dia, ~800 por chamada) acaba em ~250 chamadas, e na
+# varredura de 25 graus quadrados a LLM marcou 44% como "alta": ela nao serve de
+# filtro, so de comentario. Mantem baixo pra nao gastar a cota a toa.
+LLM_BATCH_SIZE = 60

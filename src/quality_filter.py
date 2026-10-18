@@ -5,13 +5,16 @@ from config import SQLITE_PATH, N_AW_MAX, PM_SIGNIF_MIN
 from src.proper_motion import add_pm_columns
 
 
-def pmcode_isolado(pmcode: pd.Series) -> pd.Series:
+def pmcode_sem_troca(pmcode: pd.Series) -> pd.Series:
     # pmcode = ABCCC (spec de colunas CatWISE2020): A = n de componentes no grupo
     # de blend passivo, B = 'Y' se um secundario substituiu o primario, CCC =
-    # distancia entre as solucoes com e sem movimento. NAO e nota de qualidade:
-    # A>1 e blend, que gera PM espurio. Mantem so fonte isolada sem troca.
+    # distancia entre as solucoes com e sem movimento. Filtrar A == 1 foi testado
+    # contra 949 anas L/T/Y conhecidas e derrubava o recall de 75% pra 25%: A
+    # reflete a vizinhanca (blend com fonte proxima), nao a qualidade, e tem a
+    # mesma distribuicao em anas reais e no campo. Mantem so o corte de B (troca
+    # de primario), que nao custa recall.
     s = pmcode.fillna("").astype(str)
-    return (s.str[0] == "1") & (s.str[1] == "N")
+    return s.str[1] == "N"
 
 
 def run():
@@ -38,8 +41,8 @@ def run():
     ab_clean = df["ab_flags"] == "00"
     filtros.append(("ab_flags == '00' (sem artefato)", ab_clean.sum()))
 
-    pmcode_good = pmcode_isolado(df["pmcode"])
-    filtros.append(("pmcode A=1, B=N (fonte isolada, sem blend)", pmcode_good.sum()))
+    pmcode_good = pmcode_sem_troca(df["pmcode"])
+    filtros.append(("pmcode B=N (primario nao foi trocado)", pmcode_good.sum()))
 
     pm_signif = df["pm_signif"] >= PM_SIGNIF_MIN
     filtros.append((f"pm_total/sigma >= {PM_SIGNIF_MIN}", pm_signif.sum()))
