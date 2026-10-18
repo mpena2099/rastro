@@ -100,6 +100,31 @@ def test_make_tiles_cobre_regiao():
     assert max(t[3] for t in tiles) == config.FIELD_DEC_RANGE[1]
 
 
+def test_revisao_humana_persiste_e_valida():
+    import sqlite3
+    from app import dados
+    conn = sqlite3.connect(":memory:")
+    dados.salvar_revisao(conn, "A", "confirmado", "parece real")
+    dados.salvar_revisao(conn, "B", "descartado")
+    dados.salvar_revisao(conn, "A", "duvida", "olhar de novo")        # regrava, nao duplica
+    r = dados.ler_revisoes(conn).set_index("source_id")
+    assert len(r) == 2 and r.loc["A", "decisao"] == "duvida" and r.loc["A", "nota"] == "olhar de novo"
+    dados.apagar_revisao(conn, "B")
+    assert dados.ler_revisoes(conn)["source_id"].tolist() == ["A"]
+    try:
+        dados.salvar_revisao(conn, "C", "talvez")
+        assert False, "devia rejeitar decisao invalida"
+    except ValueError:
+        pass
+
+
+def test_url_recorte():
+    from app import dados
+    u = dados.url_recorte(150.0, 20.0, "unwise-neo2")
+    assert "layer=unwise-neo2" in u and "pixscale=1.375" in u and "size=44" in u
+    assert "pixscale=0.262" in dados.url_recorte(150.0, 20.0, "ls-dr10")
+
+
 def test_load_api_key_env():
     from src.llm_triage import load_api_key
     if config.LLM_API_KEY_ENV:

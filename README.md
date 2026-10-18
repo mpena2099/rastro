@@ -27,7 +27,7 @@ Pipeline pessoal de mineração de dados astronômicos que caça **anãs marrons
 3. **Joga fora medidas duvidosas.** Defeitos do instrumento, pontos colados em vizinhos e movimentos pequenos demais pra distinguir de erro de medida.
 4. **Joga fora o que já é conhecido.** Compara com o SIMBAD, o grande cadastro de objetos astronômicos.
 5. **Pede a nota de uma IA.** Uma IA lê os números de cada sobrevivente e dá uma nota de prioridade. Ela só ajuda a ordenar, nunca decide.
-6. **Olhar humano.** As imagens dos finalistas são conferidas à mão. Esse passo ainda é um modelo por preencher.
+6. **Olhar humano.** As imagens de cada suspeito são conferidas à mão, num app local (`streamlit run app/revisao.py`) que mostra os recortes, os números e a nota da IA, e guarda a sua decisão.
 7. **Segunda opinião** de um astrônomo, ainda por fazer.
 
 ![Quantas fontes sobram em cada fase](docs/img/funil_fases.png)
@@ -52,7 +52,7 @@ python -c "import sqlite3, pandas as pd; print(pd.read_sql('SELECT source_id, ra
 **O que fazer com o resultado**
 
 A lista é de *suspeitos*, não de descobertas. O caminho depois dela:
-1. **Olhar as imagens** dos suspeitos de nota `alta` ou `media`. O notebook `notebooks/inspecao_visual.ipynb` monta os links do IRSA Finder Chart. O que se quer ver é um ponto real no céu que **mude de lugar** entre fotos de épocas diferentes. Ferramentas como o [WiseView](http://byw.tools/wiseview) mostram isso em animação.
+1. **Olhar as imagens** dos suspeitos de nota `alta` ou `media`. O app `app/revisao.py` (veja [Como usar](#como-usar)) mostra os recortes de cada suspeito e grava sua decisão. O que se quer ver é um ponto real no céu que **mude de lugar** entre fotos de épocas diferentes. Ferramentas como o [WiseView](http://byw.tools/wiseview) mostram isso em animação.
 2. **Descartar os falsos alarmes.** Na prática, quase todos caem aqui: ruído, defeito do instrumento ou ponto mal medido.
 3. **Levar os que sobrarem a um astrônomo**, que pode confirmar com outras observações (um espectro, por exemplo) e, se for novo de verdade, publicar.
 
@@ -102,7 +102,7 @@ Fases sequenciais. Cada uma lê a tabela produzida pela anterior no SQLite e gra
 | 3 | **Filtragem fina de qualidade**: remove contaminação/artefatos por `cc_flags`/`ab_flags`, troca do componente principal (`pmcode` B=N), confusão de fontes (`n_aw`) e movimento próprio pouco significativo (PM/σ < 8) | ✅ |
 | 4 | **Cross-match contra SIMBAD** (via CDS XMatch em lote): descarta o que já é catalogado. O SIMBAD usa posições em J2000 e o CatWISE mede em ~2015, então a posição é recuada pelo movimento próprio antes do match. Sem isso, fontes com PM acima de ~0,3"/ano escapam como "novas" | ✅ |
 | 5 | **Triagem assistida por LLM**: prioriza os candidatos por consistência com uma anã L, T ou Y. A LLM ordena esforço humano, **nunca dá o veredito final**. O score varia entre rodadas (cerca de 1/3 dos candidatos mudam), então vale só como prioridade | ✅ |
-| 6 | **Inspeção visual humana** (notebook com links do IRSA Finder Chart): blink de imagem, checar fantasma de difração | 🟡 template |
+| 6 | **Inspeção visual humana** (app Streamlit): recortes unWISE e óptico com mira na posição, números, links pro WiseView, decisão confirmar/dúvida/descartar gravada em `revisao_humana`. O notebook `inspecao_visual.ipynb` é a versão antiga, só com links | ✅ |
 | 7 | **Segunda opinião** com astrônomo | ⬜ |
 
 **Quanto os cortes deixam passar.** Os limiares foram medidos contra 949 anãs L/T/Y já conhecidas (`python tools/recall_conhecidas.py`, usa rede, ~8 min). Com os cortes atuais passam **76%** delas (L 80%, T 70%, Y 77%). Duas medições mudaram o desenho: filtrar o primeiro dígito do `pmcode` (A=1) derrubava o recall de 76% pra 25%, porque ele mede vizinhança e não qualidade; e cortar por SNR em W1 perdia metade das anãs Y. As conhecidas são as mais brilhantes, então o recall pra anãs ainda não descobertas tende a ser menor.
@@ -119,6 +119,14 @@ python pipeline.py          # roda as fases 1 a 5 em sequencia
 ```
 
 As fases 1 a 4 não precisam de chave. A Fase 5 precisa de uma chave grátis de LLM (veja [Triagem por LLM](#triagem-por-llm-fase-5)). Sem chave, ela falha e as tabelas das fases anteriores continuam no banco.
+
+Revisar os candidatos (Fase 6), depois que a Fase 4 tiver rodado:
+
+```bash
+streamlit run app/revisao.py
+```
+
+O app abre no navegador com a fila de candidatos sem contraparte no Gaia, do mais ao menos significativo. Na primeira abertura ele cruza a lista com Gaia e Pan-STARRS (alguns segundos). As decisões ficam na tabela `revisao_humana` do mesmo banco e não são apagadas quando o pipeline roda de novo.
 
 Rodar uma fase isolada (cada módulo expõe `run()`; precisa da tabela da fase anterior no banco):
 
@@ -165,6 +173,7 @@ Tudo em `data/rastro.db` (SQLite). Tabelas, em ordem de fase:
 - `candidatos_fase3`: após filtro de qualidade
 - `candidatos_fase4`: após cross-match SIMBAD (com `status` e `simbad_match_id`)
 - `candidatos_fase5`: após triagem LLM (com `llm_triage_score` e `llm_triage_notes`)
+- `revisao_humana`: suas decisões da Fase 6 (`confirmado`, `duvida` ou `descartado`, com nota). Tabela própria, que o pipeline não recria
 
 ## Configuração
 
@@ -188,11 +197,14 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
 │   └── proper_motion.py     # util (pm_total, cor_w1w2)
 ├── tools/
 │   └── recall_conhecidas.py # mede o recall dos cortes contra anas conhecidas
+├── app/
+│   ├── revisao.py           # Fase 6: app Streamlit de revisao visual
+│   └── dados.py             # leitura/gravacao das revisoes e URLs dos recortes
 ├── tests/
 │   └── test_units.py        # testes de unidade offline
 ├── docs/img/                # figuras usadas neste README
 ├── notebooks/
-│   └── inspecao_visual.ipynb # Fase 6
+│   └── inspecao_visual.ipynb # versao antiga da Fase 6 (so links)
 └── data/
     └── rastro.db            # resultados (gitignored)
 ```
