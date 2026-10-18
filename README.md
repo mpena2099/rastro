@@ -60,19 +60,15 @@ A lista é de *suspeitos*, não de descobertas. O caminho depois dela:
 
 *Cada linha tem 3 recortes de 60" x 60" (unWISE em dois empilhamentos, NEO2 e NEO7, e Legacy Surveys no óptico). Embaixo, a anã L2 já catalogada 2MASS J09585080+2001525: nítida no infravermelho e vermelha no óptico. Em cima, um suspeito que a IA chegou a marcar como `alta`: quase nada aparece no centro, sinal de falso alarme. Imagens: unWISE (NASA/WISE) e Legacy Surveys (DESI), via visualizador do Legacy Surveys.*
 
-## Do que se trata
+## Contexto científico
 
-Anãs marrons são objetos "quase estrelas": massa insuficiente pra fundir hidrogênio de forma estável, então são frias e apagadas, quase invisíveis em luz visível mas detectáveis no infravermelho. As mais frias e próximas estão entre os objetos mais difíceis de achar do céu, e ainda há vizinhas do Sol não descobertas.
+O método não é novo. Kevin Luhman descobriu a **WISE 0855-0714** (a anã marrom mais fria conhecida, a ~2,3 parsecs, com movimento próprio de ~8"/ano) comparando imagens WISE de épocas diferentes. Voluntários de ciência cidadã, como os do projeto Backyard Worlds, também já acharam anãs ultrafrias vasculhando dados públicos.
 
-O truque pra encontrá-las é o **movimento próprio**: objetos próximos parecem se deslocar contra o fundo de estrelas distantes ao longo dos anos. Um movimento próprio alto é uma assinatura de proximidade. Foi assim que Kevin Luhman descobriu a **WISE 0855-0714** (a anã marrom mais fria conhecida, ~2,3 parsecs, movimento próprio de ~8"/ano) comparando imagens WISE de épocas diferentes.
+O que muda aqui é o catálogo. O CatWISE2020 (1,89 bilhão de fontes, combinando WISE e NEOWISE, 12 épocas em 8 anos) já traz o **movimento próprio calculado por fonte**, com precisão muito superior à de gerações anteriores. Não é preciso cruzar dois catálogos de épocas diferentes na mão: o ajuste já está feito, e melhor. Este projeto minera esse campo pronto.
 
-O CatWISE2020 (1,89 bilhão de fontes, combinando WISE + NEOWISE, 12 épocas em 8 anos) já traz o **movimento próprio calculado nativamente** por fonte, com precisão muito superior à de gerações anteriores. Ou seja: não é preciso cruzar dois catálogos de épocas diferentes na mão. O ajuste já está feito, e melhor. Este projeto minera esse campo pronto.
+## Que dado é esse
 
-Não há telescópio nem observação ao vivo. É garimpo de arquivo público, na linha do que voluntários de ciência cidadã (como Frank Kiwy, no Backyard Worlds) já fizeram pra descobrir dezenas de anãs ultrafrias sozinhos.
-
-## Que dado é esse (importante: é tabela, não imagem)
-
-O CatWISE2020 é um **catálogo tabular**: uma tabela gigante com ~1,89 bilhão de linhas, onde **cada linha é uma fonte detectada** no infravermelho (uma detecção pontual do céu), não uma foto. As colunas são medições numéricas já reduzidas dessa fonte:
+O CatWISE2020 é um **catálogo tabular**: cada linha é uma fonte detectada no infravermelho (um ponto no céu), não uma foto. As colunas são medições já reduzidas:
 
 | Coluna | O que é |
 |--------|---------|
@@ -83,9 +79,7 @@ O CatWISE2020 é um **catálogo tabular**: uma tabela gigante com ~1,89 bilhão 
 | `pmcode`, `ka`, `km` | blend da fonte (`pmcode` = ABCCC, A = nº de componentes) e uso de astrometria/movimento |
 | `w1flg`, `w2flg`, `cc_flags`, `ab_flags`, `n_aw` | flags de qualidade/contaminação (artefato, confusão de fontes) |
 
-Ou seja, o pipeline **não processa imagens FITS**: ele consulta e filtra linhas dessa tabela. A Fase 2 é literalmente uma query `SELECT ... WHERE ...` (em **ADQL**, uma linguagem tipo SQL) rodada no servidor do IRSA via **TAP**, um protocolo de consulta a catálogos astronômicos. Cada "candidato" que avança pelas fases é uma **linha** dessa tabela.
-
-Imagens só aparecem no fim, na **Fase 6** (inspeção visual humana), onde cada candidato finalista é aberto no visualizador de imagens do IRSA por um link, pra o olho humano confirmar (ou descartar) o que os números sugeriram.
+O pipeline **não processa imagens**. A Fase 2 é uma consulta `SELECT ... WHERE ...` em **ADQL** (uma linguagem tipo SQL), rodada no servidor do IRSA via **TAP**, um protocolo de consulta a catálogos astronômicos. Cada candidato que avança é uma linha dessa tabela. Imagens só entram no fim, na inspeção humana (Fase 6).
 
 ## O que conta como sucesso (honesto)
 
@@ -95,7 +89,7 @@ Imagens só aparecem no fim, na **Fase 6** (inspeção visual humana), onde cada
 | **Bom** | Lista curta e defensável de candidatos não catalogados numa região real, sem artefatos óbvios | Sim, com esforço razoável |
 | **Moonshot** | Um candidato genuinamente novo, validado por segunda opinião | Não, é o horizonte |
 
-A maioria dos candidatos que sobram no funil cai em "já catalogado", "artefato instrumental" ou "fonte mal medida". Isso é normal, inclusive em pipelines profissionais. O valor entregue está no pipeline funcionar corretamente, não no achado em si.
+O valor entregue está no pipeline funcionar corretamente, não no achado em si.
 
 ## Como o pipeline funciona
 
@@ -122,15 +116,13 @@ export PYTHONUNBUFFERED=1
 python pipeline.py          # roda as fases 1 a 5 em sequencia
 ```
 
-As fases 1 a 4 não precisam de chave. A Fase 5 precisa de uma chave grátis do Groq ([console.groq.com](https://console.groq.com)), lida de `GROQ_API_KEY` ou, se ela não existir, de `~/.local/share/opencode/auth.json` (veja [Triagem por LLM](#triagem-por-llm-fase-5)). Sem chave, a Fase 5 falha e as tabelas das fases anteriores continuam no banco.
+As fases 1 a 4 não precisam de chave. A Fase 5 precisa de uma chave grátis de LLM (veja [Triagem por LLM](#triagem-por-llm-fase-5)). Sem chave, ela falha e as tabelas das fases anteriores continuam no banco.
 
 Rodar uma fase isolada (cada módulo expõe `run()`; precisa da tabela da fase anterior no banco):
 
 ```bash
 python -c "from src.llm_triage import run; run()"
 ```
-
-A **Fase 1 é o portão de aceite**: se o movimento próprio de Luhman 16 não bater com a referência, ela chama `sys.exit(1)` e para tudo. Use-a pra validar que IRSA/SIMBAD estão respondendo.
 
 ## Como testar
 
@@ -143,29 +135,23 @@ python tests/test_units.py      # runner embutido, sem dependencia
 # ou, se tiver pytest:  python -m pytest tests/
 ```
 
-**2. Teste de sanidade / integração (Fase 1, usa rede).** É o verdadeiro teste de aceite do sistema: redescobre objetos reais conhecidos (Luhman 16 e WISE 0855) no CatWISE2020 e confere se o movimento próprio medido bate com a referência. O IRSA devolve 504 de vez em quando; a Fase 1 tenta de novo até 3 vezes. Se isso falhar, a stack de dados está com problema e não adianta seguir.
+**2. Teste de sanidade / integração (Fase 1, usa rede).** É o verdadeiro teste de aceite do sistema: redescobre objetos reais conhecidos (Luhman 16 e WISE 0855) no CatWISE2020 e confere se o movimento próprio medido bate com a referência. O IRSA devolve 504 de vez em quando; a Fase 1 tenta de novo até 3 vezes. Se o Luhman 16 não bater com a referência, ela chama `sys.exit(1)` e para tudo: a stack de dados (IRSA/SIMBAD) está com problema e não adianta seguir.
 
 ```bash
 python -c "from src.sanity_check import run; run()"
-```
-
-Para exercitar só a triagem da LLM (precisa de chave configurada, ver abaixo) sem rodar as fases de dados:
-
-```bash
-python -c "from src.llm_triage import run; run()"
 ```
 
 Não há mocks das APIs externas (IRSA/SIMBAD/LLM): a filosofia aqui é validar contra os serviços reais via Fase 1, já que a corretude depende justamente de os catálogos responderem o esperado.
 
 ## Triagem por LLM (Fase 5)
 
-É **provider-agnóstico**: fala o formato OpenAI (`/chat/completions`) via `httpx`, sem SDK. Trocar de provider é só mudar três coisas em `config.py`: `LLM_BASE_URL`, `LLM_MODEL` e de onde vem a chave. Há exemplos comentados pra Gemini, OpenRouter, Zhipu e Ollama.
+Esta é a única fase que precisa de chave. É **provider-agnóstico**: fala o formato OpenAI (`/chat/completions`) via `httpx`, sem SDK. Trocar de provider é só mudar três coisas em `config.py`: `LLM_BASE_URL`, `LLM_MODEL` e de onde vem a chave. Há exemplos comentados pra Gemini, OpenRouter, Zhipu e Ollama.
 
 - **Default: Groq free** (`openai/gpt-oss-20b`, modo texto com `reasoning_effort` baixo). Chave grátis, sem cartão, em [console.groq.com](https://console.groq.com). Cota (tokens/min e tokens/dia) é **por modelo**, então dá pra alternar de modelo se um esgotar.
 - **Alternativa sem cota diária** (pra iterar bastante): **Zhipu GLM-4.7-Flash**, perpetuamente free (exemplo pronto no `config.py`).
 - **Zero cota / offline**: Ollama local.
 
-A chave é resolvida por `load_api_key()`: primeiro a env var (ex: `GROQ_API_KEY`), senão o arquivo `~/.local/share/opencode/auth.json` (campo `<provider>.key`).
+A chave é resolvida por `load_api_key()`: primeiro a env var (ex: `export GROQ_API_KEY=...`), senão o arquivo `~/.local/share/opencode/auth.json` (campo `<provider>.key`). O projeto não lê arquivo `.env`.
 
 A triagem pode usar **saída estruturada** (`response_format` json_schema, `LLM_STRUCTURED=True`), mas o default é o modo texto: o `gpt-oss-20b` no Groq falha o JSON em boa parte das chamadas. Se o modelo rejeitar o formato, cai no modo texto e lê o veredito da resposta. Resposta vazia vira `erro`, nunca um score. Regra do score: **`alta` só sai de um veredito explícito do modelo**; heurística por palavra-chave só rebaixa, nunca promove, pra não gerar falso positivo.
 
@@ -173,10 +159,10 @@ A triagem pode usar **saída estruturada** (`response_format` json_schema, `LLM_
 
 Tudo em `data/rastro.db` (SQLite). Tabelas, em ordem de fase:
 
-- `campo_bruto` — resultado da query TAP (Fase 2)
-- `candidatos_fase3` — após filtro de qualidade
-- `candidatos_fase4` — após cross-match SIMBAD (com `status` e `simbad_match_id`)
-- `candidatos_fase5` — após triagem LLM (com `llm_triage_score` e `llm_triage_notes`)
+- `campo_bruto`: resultado da query TAP (Fase 2)
+- `candidatos_fase3`: após filtro de qualidade
+- `candidatos_fase4`: após cross-match SIMBAD (com `status` e `simbad_match_id`)
+- `candidatos_fase5`: após triagem LLM (com `llm_triage_score` e `llm_triage_notes`)
 
 ## Configuração
 
