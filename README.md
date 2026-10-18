@@ -2,6 +2,64 @@
 
 Pipeline pessoal de mineração de dados astronômicos que caça **anãs marrons e estrelas frias próximas ao Sol** ainda não catalogadas, procurando por **movimento próprio anômalo** no catálogo público **CatWISE2020**.
 
+![Ilustração artística de uma anã marrom](docs/img/eso1404c.jpg)
+
+*Ilustração artística de uma anã marrom (Luhman 16B), parte do terceiro sistema mais próximo do Sol. Crédito: ESO/I. Crossfield/N. Risinger (skysurvey.org), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).*
+
+## Em palavras simples
+
+**A pergunta:** existem objetos frios e escuros perto do Sol que ninguém descobriu ainda?
+
+**O que se procura:** as *anãs marrons*, "estrelas fracassadas". Têm massa demais pra serem planetas e de menos pra acender como uma estrela. Quase não emitem luz visível, mas emitem calor (infravermelho), então um telescópio infravermelho consegue enxergá-las.
+
+**Como achar:** as estrelas parecem paradas no céu, mas as que estão perto se mexem devagar, ano após ano. É como olhar a paisagem pela janela do carro: o poste ao lado passa rápido, a montanha ao longe parece parada. Esse deslocamento no céu se chama *movimento próprio*. Um objeto que se move muito pra um ponto tão apagado é um forte suspeito de estar perto de nós.
+
+![Movimento próprio de WISE 0855-0714 contra as estrelas de fundo](docs/img/movimento_proprio_wise0855.png)
+
+*Quase tudo no fundo (cinza) fica no lugar. A WISE 0855-0714 (laranja), a anã marrom mais fria que se conhece, anda cerca de 80 segundos de arco em 10 anos. É esse tipo de movimento que o projeto procura.*
+
+**Onde estão os dados:** o telescópio espacial WISE fotografou o céu todo várias vezes ao longo de 8 anos. Astrônomos já transformaram essas fotos numa enorme tabela pública, o *CatWISE2020*, com 1,89 bilhão de linhas. Cada linha é um ponto de luz, com sua posição, seu brilho e o quanto ele se mexeu. **O projeto não olha fotos nem usa telescópio: ele lê essa tabela e filtra.**
+
+**O que o programa faz, passo a passo.** Pense numa peneira com várias malhas, cada uma deixando passar menos gente:
+
+1. **Confere as ferramentas.** Procura dois objetos famosos que já se conhece. Se não os achar, algo está errado e o programa para.
+2. **Baixa um pedaço do céu.** Hoje, uma área de 1 grau por 1 grau (cerca de 5 vezes a Lua cheia), só com pontos que se movem rápido.
+3. **Joga fora medidas duvidosas.** Defeitos do instrumento, pontos colados em vizinhos e movimentos pequenos demais pra distinguir de erro de medida.
+4. **Joga fora o que já é conhecido.** Compara com o SIMBAD, o grande cadastro de objetos astronômicos.
+5. **Pede a nota de uma IA.** Uma IA lê os números de cada sobrevivente e dá uma nota de prioridade. Ela só ajuda a ordenar, nunca decide.
+6. **Olhar humano.** As imagens dos finalistas são conferidas à mão. Esse passo ainda é um modelo por preencher.
+7. **Segunda opinião** de um astrônomo, ainda por fazer.
+
+![Quantas fontes sobram em cada fase](docs/img/funil_fases.png)
+
+**O que esperar:** quase tudo que passa pela peneira é falso alarme ou já era conhecido, e isso é normal até em projetos profissionais. No campo de teste, o programa reencontrou sozinho uma anã marrom que já estava catalogada, sinal de que os filtros funcionam. Os candidatos que sobraram parecem falsos alarmes. Uma descoberta nova é o horizonte, não a promessa.
+
+## O que entra, o que sai e o que fazer com isso
+
+**O que alimenta o programa**
+- **Uma região do céu**, dada por coordenadas (RA e Dec) em `config.py`, e os limiares dos filtros (quão rápido o ponto tem de se mover, quão nítida a medida precisa ser).
+- **Dois bancos de dados públicos**, baixados da internet na hora: a tabela CatWISE2020 (NASA/IPAC) e o cadastro SIMBAD (CDS, Estrasburgo).
+- **Uma chave grátis de IA** (Groq), só pra nota da última fase.
+
+**O que ele devolve**
+
+Uma tabela, `candidatos_fase5`, no arquivo `data/rastro.db`. Cada linha é um **suspeito**: código da fonte, posição no céu, brilho e cor no infravermelho, movimento próprio (e quantas vezes ele é maior que o erro de medida), a nota da IA (`alta`, `media`, `baixa` ou `incerta`) e um parágrafo curto com o motivo da nota. Pra ver a lista, ordenada pelos que mais se movem:
+
+```bash
+python -c "import sqlite3, pandas as pd; print(pd.read_sql('SELECT source_id, ra, dec, pm_total, llm_triage_score FROM candidatos_fase5 ORDER BY pm_total DESC', sqlite3.connect('data/rastro.db')))"
+```
+
+**O que fazer com o resultado**
+
+A lista é de *suspeitos*, não de descobertas. O caminho depois dela:
+1. **Olhar as imagens** dos suspeitos de nota `alta` ou `media`. O notebook `notebooks/inspecao_visual.ipynb` monta os links do IRSA Finder Chart. O que se quer ver é um ponto real no céu que **mude de lugar** entre fotos de épocas diferentes. Ferramentas como o [WiseView](http://byw.tools/wiseview) mostram isso em animação.
+2. **Descartar os falsos alarmes.** Na prática, quase todos caem aqui: ruído, defeito do instrumento ou ponto mal medido.
+3. **Levar os que sobrarem a um astrônomo**, que pode confirmar com outras observações (um espectro, por exemplo) e, se for novo de verdade, publicar.
+
+![Exemplo real: uma anã L já conhecida (embaixo) e um falso alarme (em cima)](docs/img/resultado_exemplo.jpg)
+
+*Cada linha tem 3 recortes de 60" x 60" (unWISE em dois empilhamentos, NEO2 e NEO7, e Legacy Surveys no óptico). Embaixo, a anã L2 já catalogada 2MASS J09585080+2001525: nítida no infravermelho e vermelha no óptico. Em cima, um suspeito que a IA chegou a marcar como `alta`: quase nada aparece no centro, sinal de falso alarme. Imagens: unWISE (NASA/WISE) e Legacy Surveys (DESI), via visualizador do Legacy Surveys.*
+
 ## Do que se trata
 
 Anãs marrons são objetos "quase estrelas": massa insuficiente pra fundir hidrogênio de forma estável, então são frias e apagadas, quase invisíveis em luz visível mas detectáveis no infravermelho. As mais frias e próximas estão entre os objetos mais difíceis de achar do céu, e ainda há vizinhas do Sol não descobertas.
@@ -142,6 +200,7 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
 │   └── proper_motion.py     # util (pm_total, cor_w1w2)
 ├── tests/
 │   └── test_units.py        # testes de unidade offline
+├── docs/img/                # figuras usadas neste README
 ├── notebooks/
 │   └── inspecao_visual.ipynb # Fase 6
 └── data/
