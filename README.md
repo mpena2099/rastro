@@ -196,3 +196,7 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
 ## Projeto conceitual
 
 A especificação técnica completa (motivação, fundamentação, armadilhas, referências) está em [`projeto-rastro-especificacao-tecnica.md`](projeto-rastro-especificacao-tecnica.md).
+
+## Licença
+
+Código sob a licença [MIT](LICENSE). Imagens de terceiros mantêm a licença indicada na legenda.
