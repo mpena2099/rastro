@@ -125,6 +125,16 @@ def test_url_recorte():
     assert "pixscale=0.262" in dados.url_recorte(150.0, 20.0, "ls-dr10")
 
 
+def test_classificar_allwise():
+    from app.dados import classificar_allwise as c
+    assert c(5.0, 0.4, 5.0) == "consistente"      # esta onde o PM preve, longe da atual
+    assert c(5.0, 5.0, 0.4) == "parado"           # esta na posicao atual: nao se moveu
+    assert c(5.0, 9.0, 8.0) == "sem fonte"        # nada perto de nenhuma das duas
+    assert c(5.0, None, None) == "sem fonte"      # nenhuma fonte AllWISE na vizinhanca
+    assert c(0.8, 0.1, 0.5) == "sem teste"        # PM baixo: as duas posicoes se confundem
+    assert c(5.0, 2.5, 2.8) == "ambiguo"          # perto das duas, sem desempate
+
+
 def test_load_api_key_env():
     from src.llm_triage import load_api_key
     if config.LLM_API_KEY_ENV:

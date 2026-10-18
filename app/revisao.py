@@ -28,9 +28,15 @@ CAMADAS = [
     ("ls-dr10", "Óptico (Legacy Surveys DR10, grz)"),
 ]
 ORDENACOES = {
-    "Significância do PM (maior primeiro)": ("pm_signif", False),
-    "Movimento próprio (maior primeiro)": ("pm_total", False),
-    "Cor W1-W2 (mais vermelho primeiro)": ("cor_w1w2", False),
+    "AllWISE consistente primeiro, depois PM/σ": [("allwise_ordem", True), ("pm_signif", False)],
+    "Significância do PM (maior primeiro)": [("pm_signif", False)],
+    "Movimento próprio (maior primeiro)": [("pm_total", False)],
+    "Cor W1-W2 (mais vermelho primeiro)": [("cor_w1w2", False)],
+}
+ALLWISE_ORDEM = {"consistente": 0, "ambiguo": 1, "sem fonte": 2, "sem teste": 2, "parado": 3}
+ALLWISE_ROTULO = {
+    "consistente": "se moveu (confere)", "parado": "não se moveu", "ambiguo": "ambíguo",
+    "sem fonte": "sem fonte (fraco?)", "sem teste": "PM baixo demais",
 }
 ROTULOS = {"confirmado": "Confirmado", "duvida": "Dúvida", "descartado": "Descartado"}
 
@@ -61,12 +67,15 @@ def recorte(ra: float, dec: float, camada: str):
     return img
 
 
-@st.cache_data(show_spinner="Cruzando com Gaia e Pan-STARRS (uma vez)...")
+@st.cache_data(show_spinner="Cruzando com Gaia, Pan-STARRS e AllWISE (uma vez)...")
 def cruzamentos(df: pd.DataFrame):
-    try:
-        return dados.cruzar_gaia_ps1(df[["source_id", "ra", "dec", "pmra", "pmdec"]])
-    except Exception as e:
-        return str(e)
+    out, erros = df[["source_id"]].copy(), []
+    for nome, fn in (("Gaia/Pan-STARRS", dados.cruzar_gaia_ps1), ("AllWISE", dados.cruzar_allwise)):
+        try:
+            out = out.merge(fn(df), on="source_id", how="left")
+        except Exception as e:
+            erros.append(f"{nome}: {e}")
+    return out, erros
 
 
 def conectar() -> sqlite3.Connection:
@@ -102,26 +111,43 @@ if todos.empty:
     st.warning("A tabela candidatos_fase4 não tem candidatos.")
     st.stop()
 
-cruz = cruzamentos(todos)
-if isinstance(cruz, str):
-    st.sidebar.warning(f"Sem cruzamento com Gaia/Pan-STARRS: {cruz}")
-    todos["gaia_detectada"] = pd.NA
-    todos["ps1_detectada"] = pd.NA
-    todos["gaia_g"] = pd.NA
-else:
-    todos = todos.merge(cruz, on="source_id", how="left")
+cruz, erros_cruz = cruzamentos(
+    todos[["source_id", "ra", "dec", "pmra", "pmdec", "meanobsmjd"]])
+for e in erros_cruz:
+    st.sidebar.warning(f"Sem cruzamento, {e}")
+todos = todos.merge(cruz, on="source_id", how="left")
+for coluna, padrao in (("gaia_detectada", pd.NA), ("ps1_detectada", pd.NA), ("gaia_g", pd.NA),
+                       ("allwise_status", "sem dados")):
+    if coluna not in todos:
+        todos[coluna] = padrao
+todos["allwise_status"] = todos["allwise_status"].fillna("sem dados")
+todos["allwise_ordem"] = todos["allwise_status"].map(ALLWISE_ORDEM).fillna(2)
 
 todos["decisao"] = todos["decisao"].fillna("pendente")
 
 # ---------------------------------------------------------------- filtros
 st.sidebar.header("Fila de revisão")
-sel_decisao = st.sidebar.multiselect(
-    "Situação", ["pendente", *dados.DECISOES], default=["pendente"],
-    format_func=lambda x: ROTULOS.get(x, "Pendente"))
+busca = st.sidebar.text_input("Buscar por código", placeholder="ex: 002585 ou 1506p181_b0-002585",
+                              help="Acha o candidato em qualquer situação e ignora os outros filtros.").strip()
+contagem = todos["decisao"].value_counts()
+OPCOES_SITUACAO = {
+    f"Pendentes ({contagem.get('pendente', 0)})": ["pendente"],
+    f"Confirmados ({contagem.get('confirmado', 0)})": ["confirmado"],
+    f"Dúvidas ({contagem.get('duvida', 0)})": ["duvida"],
+    f"Descartados ({contagem.get('descartado', 0)})": ["descartado"],
+    f"Todos ({len(todos)})": ["pendente", *dados.DECISOES],
+}
+situacao = st.sidebar.radio("Situação", list(OPCOES_SITUACAO), index=0)
+sel_decisao = OPCOES_SITUACAO[situacao]
 gaia = st.sidebar.radio("Contraparte no Gaia", ["Qualquer", "Sem Gaia", "Com Gaia"], index=1,
                         help="Com Gaia costuma ser estrela comum já conhecida.")
 ps1 = st.sidebar.radio("Detecção óptica (Pan-STARRS)", ["Qualquer", "Sem detecção", "Com detecção"],
                        help="Anãs T e Y somem no óptico, mas anãs L aparecem. Use pra ordenar, não pra descartar.")
+allwise = st.sidebar.selectbox(
+    "Movimento no AllWISE (2010)", ["Qualquer", "Consistente", "Ambíguo", "Sem fonte ou sem teste", "Parado"],
+    help="Compara com o AllWISE, ~5 anos mais antigo. 'Consistente': a fonte estava onde o movimento "
+         "próprio prevê. 'Parado': estava no mesmo lugar de hoje. Candidato fraco costuma ficar em "
+         "'sem fonte', porque o AllWISE é mais raso: isso não prova nada.")
 sig_min = st.sidebar.slider("PM/σ mínimo", float(todos["pm_signif"].min()),
                             float(min(todos["pm_signif"].max(), 40)),
                             float(todos["pm_signif"].min()), step=0.5)
@@ -130,21 +156,39 @@ sel_scores = st.sidebar.multiselect("Nota da LLM", scores, default=scores,
                                     help="A LLM marcou 44% como 'alta': é só um comentário.")
 ordem = st.sidebar.selectbox("Ordenar por", list(ORDENACOES))
 
-fila = todos[todos["decisao"].isin(sel_decisao) & (todos["pm_signif"] >= sig_min)
-             & todos["llm_triage_score"].isin(sel_scores)]
-if gaia != "Qualquer" and todos["gaia_detectada"].notna().any():
-    fila = fila[fila["gaia_detectada"] == (gaia == "Com Gaia")]
-if ps1 != "Qualquer" and todos["ps1_detectada"].notna().any():
-    fila = fila[fila["ps1_detectada"] == (ps1 == "Com detecção")]
-col, asc = ORDENACOES[ordem]
-fila = fila.sort_values(col, ascending=asc).reset_index(drop=True)
+if busca:
+    # A busca vale pra qualquer situacao e ignora os demais filtros.
+    fila = todos[todos["source_id"].str.contains(busca, case=False, regex=False)]
+    st.sidebar.info(f"Busca ativa: {len(fila)} resultado(s), outros filtros ignorados.")
+else:
+    fila = todos[todos["decisao"].isin(sel_decisao) & (todos["pm_signif"] >= sig_min)
+                 & todos["llm_triage_score"].isin(sel_scores)]
+    if gaia != "Qualquer" and todos["gaia_detectada"].notna().any():
+        fila = fila[fila["gaia_detectada"] == (gaia == "Com Gaia")]
+    if ps1 != "Qualquer" and todos["ps1_detectada"].notna().any():
+        fila = fila[fila["ps1_detectada"] == (ps1 == "Com detecção")]
+if allwise != "Qualquer" and not busca:
+    alvo = {"Consistente": ["consistente"], "Ambíguo": ["ambiguo"], "Parado": ["parado"],
+            "Sem fonte ou sem teste": ["sem fonte", "sem teste", "sem dados"]}[allwise]
+    fila = fila[fila["allwise_status"].isin(alvo)]
+chaves = ORDENACOES[ordem]
+fila = fila.sort_values([c for c, _ in chaves], ascending=[a for _, a in chaves]).reset_index(drop=True)
 total = len(fila)
 
-assinatura = (tuple(sel_decisao), gaia, ps1, sig_min, tuple(sel_scores), ordem)
+assinatura = (busca, tuple(sel_decisao), gaia, ps1, allwise, sig_min, tuple(sel_scores), ordem)
 if st.session_state.get("assinatura") != assinatura:
     st.session_state.assinatura = assinatura
     st.session_state.pos = 0
+    st.session_state.sel_aplicada = None
 st.session_state.setdefault("pos", 0)
+
+# Clique numa linha da tabela da fila: abre aquele candidato (so quando a selecao muda,
+# pra nao brigar com os botoes Anterior/Proximo).
+_tab = st.session_state.get("tabela_fila")
+_linhas = list(_tab["selection"]["rows"]) if _tab else []
+if _linhas and _linhas != st.session_state.get("sel_aplicada") and _linhas[0] < total:
+    st.session_state.pos = _linhas[0]
+    st.session_state.sel_aplicada = _linhas
 
 revisados = int((todos["decisao"] != "pendente").sum())
 st.sidebar.metric("Revisados", f"{revisados} de {len(todos)}")
@@ -168,7 +212,7 @@ nav[1].button("Próximo ▶", on_click=mover, args=(+1, total),
 nav[2].markdown(f"**{st.session_state.pos + 1} de {total}** na fila  |  `{sid}`  |  "
                 f"RA {r['ra']:.5f}, Dec {r['dec']:+.5f}")
 
-m = st.columns(6)
+m = st.columns(7)
 m[0].metric("Movimento próprio", f"{r['pm_total']:.3f} \"/ano")
 m[1].metric("PM/σ", f"{r['pm_signif']:.1f}")
 m[2].metric("Cor W1-W2", f"{r['cor_w1w2']:.2f}")
@@ -178,6 +222,17 @@ ps1_flag = None if pd.isna(r["ps1_detectada"]) else bool(r["ps1_detectada"])
 m[4].metric("Gaia", "?" if gaia_flag is None
             else (f"G={r['gaia_g']:.1f}" if gaia_flag else "sem contraparte"))
 m[5].metric("Pan-STARRS", "?" if ps1_flag is None else ("detectada" if ps1_flag else "sem detecção"))
+m[6].metric("AllWISE (2010)", ALLWISE_ROTULO.get(r["allwise_status"], "sem dados"),
+            help="Ver o filtro 'Movimento no AllWISE' na barra lateral.")
+
+with st.expander(f"Fila completa ({total}): clique numa linha pra abrir o candidato"):
+    tabela = fila.assign(
+        gaia=fila["gaia_g"].map(lambda v: "sem" if pd.isna(v) else f"G={v:.1f}"),
+        allwise=fila["allwise_status"].map(lambda v: ALLWISE_ROTULO.get(v, v)),
+    )[["source_id", "decisao", "pm_total", "pm_signif", "cor_w1w2", "w2mpro", "allwise", "gaia",
+       "llm_triage_score"]]
+    st.dataframe(tabela, hide_index=True, on_select="rerun", selection_mode="single-row",
+                 key="tabela_fila", height=260)
 
 imgs = st.columns(len(CAMADAS))
 for coluna, (camada, titulo) in zip(imgs, CAMADAS):

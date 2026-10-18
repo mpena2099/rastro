@@ -103,3 +103,78 @@ def cruzar_gaia_ps1(df: pd.DataFrame) -> pd.DataFrame:
     out["ps1_detectada"] = out[["ps1_r", "ps1_z", "ps1_y"]].notna().any(axis=1)
     out["gaia_detectada"] = out["gaia_g"].notna()
     return out
+
+
+# Limites do teste de movimento contra o AllWISE (~2010), em segundos de arco.
+ALLWISE_TOLERANCIA = 2.0        # fonte "no lugar" se estiver a ate isso da posicao
+ALLWISE_SEPARACAO_MIN = 1.0     # e a outra posicao tem de estar pelo menos isso mais longe
+ALLWISE_VIZINHANCA = 3.0        # sem fonte a menos que isso de qualquer das duas posicoes
+ALLWISE_DESLOC_MIN = 1.5        # deslocamento esperado abaixo disso: sem poder de teste
+
+
+def classificar_allwise(deslocamento: float, sep_prev: float | None, sep_atual: float | None) -> str:
+    """Compara onde o AllWISE viu uma fonte com onde o movimento proprio manda ela estar.
+
+    deslocamento: quanto o objeto deveria ter andado entre as duas epocas (arcsec).
+    sep_prev / sep_atual: distancia da fonte AllWISE mais proxima a posicao prevista
+    (CatWISE recuada pelo PM) e a posicao atual do CatWISE; None se nao ha fonte.
+    'consistente' = a fonte esta onde o PM preve e longe da posicao atual (se moveu);
+    'parado' = esta na posicao atual e longe da prevista (nao se moveu).
+    """
+    if deslocamento < ALLWISE_DESLOC_MIN:
+        return "sem teste"
+    if sep_prev is None or sep_atual is None or min(sep_prev, sep_atual) > ALLWISE_VIZINHANCA:
+        return "sem fonte"
+    if sep_prev <= ALLWISE_TOLERANCIA and sep_atual - sep_prev >= ALLWISE_SEPARACAO_MIN:
+        return "consistente"
+    if sep_atual <= ALLWISE_TOLERANCIA and sep_prev - sep_atual >= ALLWISE_SEPARACAO_MIN:
+        return "parado"
+    return "ambiguo"
+
+
+def cruzar_allwise(df: pd.DataFrame, lote: int = 100) -> pd.DataFrame:
+    """Teste de movimento independente: o AllWISE mediu ~5 anos antes do CatWISE.
+
+    Se o PM do CatWISE for real, a fonte tem de estar no AllWISE na posicao recuada
+    pelo PM, e nao na atual. O AllWISE e mais raso (W2 ~ 15,6 contra ~ 16,8): candidato
+    fraco quase sempre cai em 'sem fonte', o que nao prova nada.
+    Precisa de: source_id, ra, dec, pmra, pmdec, meanobsmjd.
+    """
+    import time
+    import pyvo
+    from astropy.table import Table
+
+    svc = pyvo.dal.TAPService("https://irsa.ipac.caltech.edu/TAP")
+    q = """SELECT TAP_UPLOAD.t.rid AS rid, a.ra AS a_ra, a.dec AS a_dec, a.w2mjdmean AS a_mjd
+FROM allwise_p3as_psd AS a, TAP_UPLOAD.t
+WHERE 1=CONTAINS(POINT('ICRS',a.ra,a.dec), CIRCLE('ICRS',TAP_UPLOAD.t.ra,TAP_UPLOAD.t.dec,15.0/3600.0))"""
+    d = df.reset_index(drop=True).copy()
+    d["rid"] = range(len(d))
+    partes = []
+    for i in range(0, len(d), lote):
+        up = Table.from_pandas(d[["rid", "ra", "dec"]].iloc[i:i + lote])
+        for tent in range(3):
+            try:
+                partes.append(svc.run_sync(q, uploads={"t": up}).to_table().to_pandas())
+                break
+            except Exception:
+                if tent == 2:
+                    raise
+                time.sleep(8)
+    viz = pd.concat(partes, ignore_index=True)
+
+    linhas = []
+    for x in d.itertuples():
+        n = viz[viz["rid"] == x.rid]
+        dt = (n["a_mjd"].median() - x.meanobsmjd) / 365.25 if len(n) else (55400.0 - x.meanobsmjd) / 365.25
+        desloc = float(np.hypot(x.pmra, x.pmdec) * abs(dt))
+        sp = sa = None
+        if len(n):
+            cosd = np.cos(np.radians(x.dec))
+            ra_p = x.ra + x.pmra * dt / 3600 / cosd
+            dec_p = x.dec + x.pmdec * dt / 3600
+            sp = float(np.hypot((n["a_ra"] - ra_p) * cosd, n["a_dec"] - dec_p).min() * 3600)
+            sa = float(np.hypot((n["a_ra"] - x.ra) * cosd, n["a_dec"] - x.dec).min() * 3600)
+        linhas.append((x.source_id, classificar_allwise(desloc, sp, sa), sp, sa, desloc))
+    return pd.DataFrame(linhas, columns=["source_id", "allwise_status", "allwise_sep_prevista",
+                                         "allwise_sep_atual", "allwise_desloc_esperado"])
