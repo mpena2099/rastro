@@ -125,6 +125,21 @@ def test_url_recorte():
     assert "pixscale=0.262" in dados.url_recorte(150.0, 20.0, "ls-dr10")
 
 
+def test_relatorio():
+    from src.relatorio import nome_iau, montar_html
+    assert nome_iau(150.0, 20.0) == "J100000.00+200000.0"
+    assert nome_iau(15.0, -0.5) == "J010000.00-003000.0"
+    df = pd.DataFrame([{
+        "source_id": "x", "ra": 150.0, "dec": 20.0, "decisao": "confirmado", "nota": "<b>",
+        "w1mpro": 15.0, "w2mpro": 13.5, "cor_w1w2": 1.5, "pm_total": 0.4, "pmra": 0.3, "pmdec": 0.2,
+        "pm_signif": 10.0, "w2snr": 12.0, "meanobsmjd": 57170.0, "allwise_status": "consistente",
+        "allwise_sep_prevista": 0.5, "allwise_sep_atual": 4.0, "allwise_desloc_esperado": 2.0,
+        "gaia_detectada": pd.NA, "ps1_detectada": False}])
+    h = montar_html(df, {"x": {"ls-dr10": b"\xff\xd8"}})
+    assert "J100000.00+200000.0" in h and "&lt;b&gt;" in h and "sem dado" in h
+    assert "data:image/jpeg;base64," in h and "recorte indisponivel" in h
+
+
 def test_classificar_allwise():
     from app.dados import classificar_allwise as c
     assert c(5.0, 0.4, 5.0) == "consistente"      # esta onde o PM preve, longe da atual

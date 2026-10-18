@@ -15,3 +15,4 @@ data/rastro.db
 # Segredos locais
 .env
 data/recall_conhecidas.pkl
+data/relatorio/

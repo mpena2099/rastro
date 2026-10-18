@@ -55,3 +55,5 @@ O `score` (`alta`/`baixa`/`incerta`/`media`) vem do modo texto (default) ou, com
 ## Convenções
 
 Código, prints e nomes de tabela/coluna são em português. Ao adicionar uma fase nova, siga o contrato existente: função `run()` que lê a tabela anterior do SQLite, processa com pandas e grava a próxima tabela. Mantenha os prints de progresso (o pipeline é interativo e longo).
+
+**Fases manuais (fora do `pipeline.py`):** Fase 6 é o app Streamlit `app/revisao.py` (grava `revisao_humana`, tabela que o pipeline não recria). Fase 7 é `python src/relatorio.py [--duvidas]`: lê `revisao_humana`, refaz Gaia/Pan-STARRS/AllWISE só pros escolhidos e grava `data/relatorio/relatorio.html` (imagens embutidas) e `candidatos.csv`.
