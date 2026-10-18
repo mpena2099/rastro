@@ -64,6 +64,8 @@ export PYTHONUNBUFFERED=1
 python pipeline.py          # roda as fases 1 a 5 em sequencia
 ```
 
+As fases 1 a 4 não precisam de chave. A Fase 5 precisa de uma chave grátis do Groq ([console.groq.com](https://console.groq.com)), lida de `GROQ_API_KEY` ou, se ela não existir, de `~/.local/share/opencode/auth.json` (veja [Triagem por LLM](#triagem-por-llm-fase-5)). Sem chave, a Fase 5 falha e as tabelas das fases anteriores continuam no banco.
+
 Rodar uma fase isolada (cada módulo expõe `run()`; precisa da tabela da fase anterior no banco):
 
 ```bash
