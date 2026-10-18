@@ -149,11 +149,20 @@ Fases sequenciais. Cada uma lê a tabela produzida pela anterior no SQLite e gra
 | 4 | **Cross-match contra SIMBAD** (via CDS XMatch em lote): descarta o que já é catalogado. O SIMBAD usa posições em J2000 e o CatWISE mede em ~2015, então a posição é recuada pelo movimento próprio antes do match. Sem isso, fontes com PM acima de ~0,3"/ano escapam como "novas" | ✅ |
 | 5 | **Triagem assistida por LLM**: prioriza os candidatos por consistência com uma anã L, T ou Y. A LLM ordena esforço humano, **nunca dá o veredito final**. O score varia entre rodadas (cerca de 1/3 dos candidatos mudam), então vale só como prioridade | ✅ |
 | 6 | **Inspeção visual humana** (app Streamlit): recortes unWISE e óptico com mira na posição, números, links pro WiseView, teste de movimento contra o AllWISE, busca por código e filtro por situação, decisão confirmar/dúvida/descartar gravada em `revisao_humana`. O notebook `inspecao_visual.ipynb` é a versão antiga, só com links | ✅ |
-| 7 | **Relatório** dos confirmados (HTML com imagens embutidas e CSV), pra enviar a um astrônomo e pedir uma segunda opinião. Manual, como a Fase 6 | ✅ |
+| 7 | **Relatório** dos confirmados (HTML com imagens embutidas), gerado por botão no app ou por `python src/relatorio.py` (que também grava um CSV), pra enviar a um astrônomo e pedir uma segunda opinião. Manual, como a Fase 6 | ✅ |
 
 **Quanto os cortes deixam passar.** Os limiares foram medidos contra 949 anãs L/T/Y já conhecidas (`python tools/recall_conhecidas.py`, usa rede, ~8 min). Com os cortes atuais passam **76%** delas (L 80%, T 70%, Y 77%). Duas medições mudaram o desenho: filtrar o primeiro dígito do `pmcode` (A=1) derrubava o recall de 76% pra 25%, porque ele mede vizinhança e não qualidade; e cortar por SNR em W1 perdia metade das anãs Y. As conhecidas são as mais brilhantes, então o recall pra anãs ainda não descobertas tende a ser menor.
 
 ## Como usar
+
+O uso tem duas partes, uma no terminal e outra no navegador:
+
+| Parte | Onde | Comando | Para quê |
+|---|---|---|---|
+| Fases 1 a 5 | Terminal | `python pipeline.py` | Baixar o céu, filtrar e montar a lista de candidatos. Leva um bom tempo e roda sozinho |
+| Fases 6 e 7 | Navegador | `streamlit run app/revisao.py` | Olhar as imagens, decidir e baixar o relatório dos confirmados |
+
+O pipeline é um lote longo, sem interação, e o terminal serve bem. A revisão precisa de imagens e de decisão humana, e por isso vive no navegador. O pipeline só precisa ser rodado de novo para varrer outra região ou refazer os cortes.
 
 A partir da raiz do repositório:
 
@@ -166,7 +175,7 @@ python pipeline.py          # roda as fases 1 a 5 em sequencia
 
 As fases 1 a 4 não precisam de chave. A Fase 5 precisa de uma chave grátis de LLM (veja [Triagem por LLM](#triagem-por-llm-fase-5)). Sem chave, ela falha e as tabelas das fases anteriores continuam no banco.
 
-Revisar os candidatos (Fase 6), depois que a Fase 4 tiver rodado:
+Revisar os candidatos (Fases 6 e 7), depois que a Fase 4 tiver rodado:
 
 ```bash
 streamlit run app/revisao.py
@@ -178,20 +187,19 @@ Na barra lateral:
 - **Situação:** pendentes, confirmados, dúvidas, descartados ou todos, cada um com a contagem. É por aqui que se revê o que já foi classificado.
 - **Buscar por código:** acha qualquer candidato pelo código (ou pelo final dele), em qualquer situação.
 - **Filtros** de Gaia, Pan-STARRS, movimento no AllWISE, PM/σ mínimo e nota da IA, e a **ordenação**.
+- **Relatório (Fase 7):** o botão "Gerar relatório" monta uma página HTML com os confirmados (ou confirmados e dúvidas, se marcar a caixa) e o botão "Baixar relatório" entrega o arquivo. Leva alguns segundos por candidato, para baixar os recortes.
 - No corpo da página, o quadro "Fila completa" lista a fila, e um clique numa linha abre aquele candidato.
 
 **O teste do AllWISE.** O AllWISE mediu o céu uns 5 anos antes do CatWISE. Se o movimento próprio de um candidato for real, a fonte tem de aparecer lá na posição recuada pelo movimento, e não onde ela está hoje. O app marca cada candidato como *se moveu (confere)*, *não se moveu*, *ambíguo*, *sem fonte* ou *PM baixo demais pra testar*. O AllWISE é mais raso que o CatWISE, então um candidato fraco quase sempre cai em "sem fonte", e isso não prova nada.
 
 As decisões ficam na tabela `revisao_humana` do mesmo banco e não são apagadas quando o pipeline roda de novo.
 
-Gerar o relatório dos confirmados (Fase 7):
+**O relatório (Fase 7).** É uma página com recortes, números, resultado do AllWISE, a sua nota e links. Abre offline e dá pra anexar num e-mail. A página diz o que a lista não afirma: são candidatos, não descobertas. Sem o app, o mesmo relatório sai pelo terminal, junto com um `candidatos.csv`, em `data/relatorio/`:
 
 ```bash
 python src/relatorio.py            # só os confirmados
 python src/relatorio.py --duvidas  # confirmados e dúvidas
 ```
-
-Sai `data/relatorio/relatorio.html` (uma página com recortes, números, resultado do AllWISE, a sua nota e links; abre offline e dá pra anexar num e-mail) e `data/relatorio/candidatos.csv`. A página diz o que a lista não afirma: são candidatos, não descobertas.
 
 Rodar uma fase isolada (cada módulo expõe `run()`; precisa da tabela da fase anterior no banco):
 
@@ -259,7 +267,7 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
 │   ├── quality_filter.py    # Fase 3
 │   ├── known_catalog_match.py # Fase 4
 │   ├── llm_triage.py        # Fase 5
-│   ├── relatorio.py         # Fase 7: relatorio HTML/CSV dos confirmados
+│   ├── relatorio.py         # Fase 7: relatorio dos confirmados (HTML, e CSV pela linha de comando)
 │   └── proper_motion.py     # util (pm_total, cor_w1w2)
 ├── tools/
 │   └── recall_conhecidas.py # mede o recall dos cortes contra anas conhecidas

@@ -21,6 +21,7 @@ from PIL import Image, ImageDraw
 
 from app import dados
 from config import ROOT, SQLITE_PATH
+from src import relatorio
 
 CAMADAS = [
     ("unwise-neo2", "unWISE NEO2 (infravermelho)"),
@@ -193,6 +194,20 @@ if _linhas and _linhas != st.session_state.get("sel_aplicada") and _linhas[0] < 
 revisados = int((todos["decisao"] != "pendente").sum())
 st.sidebar.metric("Revisados", f"{revisados} de {len(todos)}")
 st.sidebar.caption({d: int((todos['decisao'] == d).sum()) for d in dados.DECISOES})
+
+# ---------------------------------------------------------------- relatorio (Fase 7)
+st.sidebar.header("Relatório (Fase 7)")
+com_duvidas = st.sidebar.checkbox("Incluir dúvidas", value=False)
+n_rel = int(todos["decisao"].isin(["confirmado"] + (["duvida"] if com_duvidas else [])).sum())
+if st.sidebar.button(f"Gerar relatório ({n_rel})", disabled=n_rel == 0,
+                     help="Página HTML com recortes e números dos confirmados, para enviar a um astrônomo."):
+    with st.sidebar, st.spinner("Baixando recortes..."):
+        st.session_state.relatorio = (relatorio.gerar_html(relatorio.filtrar_revisados(todos, com_duvidas)),
+                                      n_rel)
+if "relatorio" in st.session_state:
+    html_rel, n_gerado = st.session_state.relatorio
+    st.sidebar.download_button(f"Baixar relatório ({n_gerado})", html_rel, file_name="rastro_relatorio.html",
+                               mime="text/html")
 
 # ---------------------------------------------------------------- tela
 st.title("Rastro: revisão visual")

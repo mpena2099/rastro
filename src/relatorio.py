@@ -131,16 +131,38 @@ O teste do AllWISE e raso: fonte fraca costuma cair em "sem fonte", que nao prov
 </body></html>"""
 
 
-def selecionar(conn: sqlite3.Connection, incluir_duvidas: bool) -> pd.DataFrame:
-    df = dados.carregar_candidatos(conn)
+def filtrar_revisados(df: pd.DataFrame, incluir_duvidas: bool) -> pd.DataFrame:
     aceitas = ["confirmado"] + (["duvida"] if incluir_duvidas else [])
-    return df[df["decisao"].isin(aceitas)].sort_values(["decisao", "pm_signif"],
-                                                      ascending=[True, False]).reset_index(drop=True)
+    return df[df["decisao"].isin(aceitas)].sort_values(
+        ["decisao", "pm_signif"], ascending=[True, False]).reset_index(drop=True)
+
+
+def completar_colunas(sel: pd.DataFrame) -> pd.DataFrame:
+    """Garante as colunas dos cruzamentos, mesmo que algum tenha falhado."""
+    sel = sel.copy()
+    for coluna in ("gaia_detectada", "ps1_detectada", "allwise_sep_prevista", "allwise_sep_atual",
+                   "allwise_desloc_esperado"):
+        if coluna not in sel:
+            sel[coluna] = pd.NA
+    if "allwise_status" not in sel:
+        sel["allwise_status"] = "sem dados"
+    sel["allwise_status"] = sel["allwise_status"].fillna("sem dados")
+    return sel
+
+
+def gerar_html(sel: pd.DataFrame) -> str:
+    """Baixa os recortes e monta a pagina. `sel` ja traz os cruzamentos (Gaia/PS1/AllWISE)."""
+    sel = completar_colunas(sel)
+    imagens = {}
+    for x in sel.itertuples():
+        print(f"  recortes de {x.source_id}")
+        imagens[x.source_id] = {c: baixar_recorte(x.ra, x.dec, c) for c, _ in CAMADAS}
+    return montar_html(sel, imagens)
 
 
 def run(incluir_duvidas: bool = False) -> Path | None:
     with sqlite3.connect(str(config.SQLITE_PATH)) as conn:
-        sel = selecionar(conn, incluir_duvidas)
+        sel = filtrar_revisados(dados.carregar_candidatos(conn), incluir_duvidas)
     if sel.empty:
         print("Nenhum candidato confirmado. Revise a fila no app (streamlit run app/revisao.py).")
         return None
@@ -152,22 +174,11 @@ def run(incluir_duvidas: bool = False) -> Path | None:
             sel = sel.merge(fn(entrada), on="source_id", how="left")
         except Exception as e:
             print(f"AVISO: sem cruzamento {nome}: {e}")
-    for coluna in ("gaia_detectada", "ps1_detectada", "allwise_sep_prevista", "allwise_sep_atual",
-                   "allwise_desloc_esperado"):
-        if coluna not in sel:
-            sel[coluna] = pd.NA
-    if "allwise_status" not in sel:
-        sel["allwise_status"] = "sem dados"
-    sel["allwise_status"] = sel["allwise_status"].fillna("sem dados")
-
-    imagens = {}
-    for x in sel.itertuples():
-        print(f"  recortes de {x.source_id}")
-        imagens[x.source_id] = {c: baixar_recorte(x.ra, x.dec, c) for c, _ in CAMADAS}
+    sel = completar_colunas(sel)
 
     PASTA_SAIDA.mkdir(parents=True, exist_ok=True)
     saida = PASTA_SAIDA / "relatorio.html"
-    saida.write_text(montar_html(sel, imagens), encoding="utf-8")
+    saida.write_text(gerar_html(sel), encoding="utf-8")
     sel.assign(designacao=[nome_iau(r, d) for r, d in zip(sel["ra"], sel["dec"])]).drop(
         columns=["llm_triage_notes"], errors="ignore").to_csv(PASTA_SAIDA / "candidatos.csv", index=False)
     print(f"Relatorio: {saida}")
