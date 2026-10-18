@@ -56,6 +56,23 @@ A lista é de *suspeitos*, não de descobertas. O caminho depois dela:
 2. **Descartar os falsos alarmes.** Na prática, quase todos caem aqui: ruído, defeito do instrumento ou ponto mal medido.
 3. **Levar os que sobrarem a um astrônomo**, que pode confirmar com outras observações (um espectro, por exemplo) e, se for novo de verdade, publicar.
 
+**Como decidir na revisão visual**
+
+| O que você vê | Decisão |
+|---|---|
+| Nada no centro das imagens de infravermelho, só ruído | **Descartar** |
+| Mancha larga e difusa (galáxia), ou colada numa estrela brilhante, ou no meio dos "raios" de uma estrela | **Descartar** |
+| No óptico, uma estrela clara (branca, amarela ou azul) no centro | **Descartar** (estrela comum) |
+| Ponto nítido no infravermelho, laranja ou avermelhado, e **nada** no óptico | **Confirmar** (compatível com anã T ou Y) |
+| Ponto nítido no infravermelho e um ponto **vermelho fraco** no óptico | **Confirmar** (compatível com anã L), mas com cor W1-W2 abaixo de ~0,3 pode ser só uma anã M comum, então prefira **Dúvida** |
+| Ponto no infravermelho, mas fraco, colado numa vizinha, ou você não conseguiu conferir o movimento | **Dúvida** |
+
+**Detalhes que ajudam**
+- O objeto se move. No óptico, ele pode estar um pouco deslocado da mira, na direção do movimento (movimento próprio x anos de diferença entre as imagens). Dentro do espaço vazio da mira (cerca de 6") ainda conta como no lugar.
+- No unWISE, cor avermelhada ou alaranjada é o que se espera de uma anã fria. Azul ou branco é estrela comum.
+- **Confirmar** não é descoberta: quer dizer "passa no olho". O teste decisivo é abrir o link do WiseView e ver o ponto andando sempre na mesma direção ao longo dos anos. Quem não anda é ruído.
+- **Descartar** não apaga nada: a decisão fica gravada com a nota e dá pra rever no filtro "Situação".
+
 ![Exemplo real: uma anã L já conhecida (embaixo) e um falso alarme (em cima)](docs/img/resultado_exemplo.jpg)
 
 *Cada linha tem 3 recortes de 60" x 60" (unWISE em dois empilhamentos, NEO2 e NEO7, e Legacy Surveys no óptico). Embaixo, a anã L2 já catalogada 2MASS J09585080+2001525: nítida no infravermelho e vermelha no óptico. Em cima, um suspeito que a IA chegou a marcar como `alta`: quase nada aparece no centro, sinal de falso alarme. Imagens: unWISE (NASA/WISE) e Legacy Surveys (DESI), via visualizador do Legacy Surveys.*
