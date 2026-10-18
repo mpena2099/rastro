@@ -45,11 +45,11 @@ Fases sequenciais. Cada uma lê a tabela produzida pela anterior no SQLite e gra
 
 | Fase | O que faz | Status |
 |------|-----------|--------|
-| 1 | **Teste de sanidade**: redescobre Luhman 16 (PM ~2,7"/ano) via CatWISE2020 + SIMBAD. Se falhar, o pipeline aborta, porque não faz sentido caçar objetos novos com uma stack que não acha os conhecidos | ✅ |
+| 1 | **Teste de sanidade**: redescobre Luhman 16 (PM ~2,7"/ano) e WISE 0855 (PM ~8"/ano) via CatWISE2020 + SIMBAD. Se Luhman 16 falhar, o pipeline aborta, porque não faz sentido caçar objetos novos com uma stack que não acha os conhecidos. WISE 0855 só gera aviso | ✅ |
 | 2 | **Query ao CatWISE2020** (ADQL/TAP) numa região do céu, filtrando no servidor por movimento próprio, astrometria (ka=km=3) e qualidade fotométrica (SNR, flags) | ✅ |
 | 3 | **Filtragem fina de qualidade**: remove contaminação/artefatos por `cc_flags`/`ab_flags`, fontes em blend (`pmcode`, só passa A=1 e B=N), confusão de fontes (`n_aw`) e movimento próprio pouco significativo (PM/σ < 5) | ✅ |
-| 4 | **Cross-match contra SIMBAD** (via CDS XMatch em lote): descarta o que já é catalogado | ✅ |
-| 5 | **Triagem assistida por LLM**: prioriza os candidatos por consistência com uma anã T/Y. A LLM ordena esforço humano, **nunca dá o veredito final** | ✅ |
+| 4 | **Cross-match contra SIMBAD** (via CDS XMatch em lote): descarta o que já é catalogado. O SIMBAD usa posições em J2000 e o CatWISE mede em ~2015, então a posição é recuada pelo movimento próprio antes do match. Sem isso, fontes com PM acima de ~0,3"/ano escapam como "novas" | ✅ |
+| 5 | **Triagem assistida por LLM**: prioriza os candidatos por consistência com uma anã L, T ou Y. A LLM ordena esforço humano, **nunca dá o veredito final**. O score varia entre rodadas (cerca de 1/3 dos candidatos mudam), então vale só como prioridade | ✅ |
 | 6 | **Inspeção visual humana** (notebook com links do IRSA Finder Chart): blink de imagem, checar fantasma de difração | 🟡 template |
 | 7 | **Segunda opinião** com astrônomo | ⬜ |
 
@@ -76,14 +76,14 @@ A **Fase 1 é o portão de aceite**: se o movimento próprio de Luhman 16 não b
 
 Há dois níveis de teste, do mais rápido ao mais completo:
 
-**1. Testes de unidade (offline, sem rede, instantâneos).** Cobrem a lógica pura que quebra calada se alguém mexer: derivação de movimento próprio, parsing do score da LLM (incluindo a regra "`alta` só via veredito explícito") e a montagem da query da Fase 2.
+**1. Testes de unidade (offline, sem rede, instantâneos).** Cobrem a lógica pura que quebra calada se alguém mexer: derivação de movimento próprio e de sua significância (`pm_signif`), filtro de `pmcode`, recuo de posição pra J2000 no cross-match, parsing do score da LLM (incluindo a regra "`alta` só via veredito explícito") e a montagem da query da Fase 2.
 
 ```bash
 python tests/test_units.py      # runner embutido, sem dependencia
 # ou, se tiver pytest:  python -m pytest tests/
 ```
 
-**2. Teste de sanidade / integração (Fase 1, usa rede).** É o verdadeiro teste de aceite do sistema: redescobre um objeto real conhecido (Luhman 16) no CatWISE2020 e confere se o movimento próprio medido bate com a referência. Se isso falhar, a stack de dados está com problema e não adianta seguir.
+**2. Teste de sanidade / integração (Fase 1, usa rede).** É o verdadeiro teste de aceite do sistema: redescobre objetos reais conhecidos (Luhman 16 e WISE 0855) no CatWISE2020 e confere se o movimento próprio medido bate com a referência. O IRSA devolve 504 de vez em quando; a Fase 1 tenta de novo até 3 vezes. Se isso falhar, a stack de dados está com problema e não adianta seguir.
 
 ```bash
 python -c "from src.sanity_check import run; run()"
