@@ -23,9 +23,11 @@ from app import dados
 from config import ROOT, SQLITE_PATH
 from src import relatorio
 
+# NEO7 empilha todas as epocas do WISE (2010 a 2020), entao nao mostra movimento:
+# camadas mais antigas (NEO2, NEO4) sao quase identicas a ela. Movimento se ve no
+# WiseView e no teste do AllWISE.
 CAMADAS = [
-    ("unwise-neo2", "unWISE NEO2 (infravermelho)"),
-    ("unwise-neo7", "unWISE NEO7 (infravermelho)"),
+    ("unwise-neo7", "Infravermelho (unWISE NEO7, W1+W2)"),
     ("ls-dr10", "Óptico (Legacy Surveys DR10, grz)"),
 ]
 ORDENACOES = {
@@ -44,20 +46,27 @@ ROTULOS = {"confirmado": "Confirmado", "duvida": "Dúvida", "descartado": "Desca
 st.set_page_config(page_title="Rastro: revisão visual", layout="wide")
 
 
-@st.cache_data(show_spinner=False)
 def recorte(ra: float, dec: float, camada: str):
+    """Recorte com a mira, ou None se o servidor falhar (a falha nao fica no cache)."""
+    try:
+        return _recorte(ra, dec, camada)
+    except Exception:
+        return None
+
+
+@st.cache_data(show_spinner=False)
+def _recorte(ra: float, dec: float, camada: str):
     """Baixa o recorte e marca a posicao do candidato (mira com folga no centro)."""
     url = dados.url_recorte(ra, dec, camada)
-    for _ in range(2):
+    for tentativa in range(2):
         try:
             r = httpx.get(url, timeout=30)
             r.raise_for_status()
             img = Image.open(io.BytesIO(r.content)).convert("RGB")
             break
         except Exception:
-            img = None
-    if img is None:
-        return None
+            if tentativa == 1:
+                raise
     lado = 330
     img = img.resize((lado, lado), Image.NEAREST if img.size[0] < 100 else Image.LANCZOS)
     d = ImageDraw.Draw(img)
@@ -87,11 +96,14 @@ def mover(delta: int, total: int):
     st.session_state.pos = max(0, min(total - 1, st.session_state.pos + delta))
 
 
-def registrar(source_id: str, decisao: str, total: int):
+def registrar(source_id: str, decisao: str, total: int, fica_na_fila: bool):
     nota = st.session_state.get(f"nota_{source_id}", "")
     with conectar() as conn:
         dados.salvar_revisao(conn, source_id, decisao, nota)
-    mover(+1, total)
+    # Se a decisao tira o candidato da fila (ex: fila de pendentes), o proximo sobe
+    # pra posicao atual: avancar aqui pularia um candidato sem mostrar.
+    if fica_na_fila:
+        mover(+1, total)
 
 
 def limpar(source_id: str):
@@ -131,14 +143,18 @@ st.sidebar.header("Fila de revisão")
 busca = st.sidebar.text_input("Buscar por código", placeholder="ex: 002585 ou 1506p181_b0-002585",
                               help="Acha o candidato em qualquer situação e ignora os outros filtros.").strip()
 contagem = todos["decisao"].value_counts()
+# Rotulos fixos: com a contagem no rotulo, cada decisao mudava as opcoes e o
+# Streamlit voltava o radio pra primeira opcao.
 OPCOES_SITUACAO = {
-    f"Pendentes ({contagem.get('pendente', 0)})": ["pendente"],
-    f"Confirmados ({contagem.get('confirmado', 0)})": ["confirmado"],
-    f"Dúvidas ({contagem.get('duvida', 0)})": ["duvida"],
-    f"Descartados ({contagem.get('descartado', 0)})": ["descartado"],
-    f"Todos ({len(todos)})": ["pendente", *dados.DECISOES],
+    "Pendentes": ["pendente"],
+    "Confirmados": ["confirmado"],
+    "Dúvidas": ["duvida"],
+    "Descartados": ["descartado"],
+    "Todos": ["pendente", *dados.DECISOES],
 }
-situacao = st.sidebar.radio("Situação", list(OPCOES_SITUACAO), index=0)
+situacao = st.sidebar.radio("Situação", list(OPCOES_SITUACAO), index=0, key="situacao",
+                            captions=[str(int(sum(contagem.get(d, 0) for d in v)))
+                                      for v in OPCOES_SITUACAO.values()])
 sel_decisao = OPCOES_SITUACAO[situacao]
 gaia = st.sidebar.radio("Contraparte no Gaia", ["Qualquer", "Sem Gaia", "Com Gaia"], index=1,
                         help="Com Gaia costuma ser estrela comum já conhecida.")
@@ -288,7 +304,7 @@ with st.expander("Como decidir (o que procurar nas imagens)"):
 with st.expander("Casos de referência (como são os confirmar, dúvida e descartar)"):
     abas = st.tabs(["Confirmar", "Dúvida", "Descartar"])
     textos = {
-        "confirmar": """Em cada linha: unWISE NEO2, unWISE NEO7 e óptico (Legacy Surveys). As três primeiras linhas desta folha são exemplos de **confirmar**.
+        "confirmar": """Em cada linha: infravermelho (unWISE NEO7) e óptico (Legacy Surveys). As três primeiras linhas desta folha são exemplos de **confirmar**.
 
 1. **Anã L5 conhecida.** Bolha nítida no infravermelho e um ponto vermelho no óptico, os dois na mira.
 2. **Anã T7 conhecida.** Bolha alaranjada no infravermelho, na borda da mira (o objeto andou desde 2015) e nada no óptico naquela posição. O ponto vermelho à direita, no óptico, é outra fonte.
@@ -306,6 +322,12 @@ with st.expander("Casos de referência (como são os confirmar, dúvida e descar
             st.markdown(textos[chave])
 
 st.subheader("Sua decisão")
+
+
+def fica(decisao: str) -> bool:
+    return bool(busca) or decisao in sel_decisao
+
+
 if r["decisao"] != "pendente":
     st.success(f"Já marcado como **{ROTULOS[r['decisao']]}**."
                + (f" Nota: {r['nota']}" if pd.notna(r["nota"]) and r["nota"] else ""))
@@ -314,7 +336,7 @@ st.text_area("Nota (opcional)", key=f"nota_{sid}", value=r["nota"] if pd.notna(r
              height=70)
 b = st.columns(3)
 b[0].button("Confirmar (parece real)", type="primary", on_click=registrar,
-            args=(sid, "confirmado", total), width="stretch")
-b[1].button("Dúvida", on_click=registrar, args=(sid, "duvida", total), width="stretch")
-b[2].button("Descartar (falso alarme)", on_click=registrar, args=(sid, "descartado", total),
+            args=(sid, "confirmado", total, fica("confirmado")), width="stretch")
+b[1].button("Dúvida", on_click=registrar, args=(sid, "duvida", total, fica("duvida")), width="stretch")
+b[2].button("Descartar (falso alarme)", on_click=registrar, args=(sid, "descartado", total, fica("descartado")),
             width="stretch")

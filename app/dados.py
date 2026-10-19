@@ -133,9 +133,11 @@ def classificar_allwise(deslocamento: float, sep_prev: float | None, sep_atual: 
 
 
 def cruzar_allwise(df: pd.DataFrame, lote: int = 100) -> pd.DataFrame:
-    """Teste de movimento independente: o AllWISE mediu ~5 anos antes do CatWISE.
+    """Teste de consistencia do movimento: o AllWISE mediu ~5 anos antes do CatWISE.
 
-    Se o PM do CatWISE for real, a fonte tem de estar no AllWISE na posicao recuada
+    Nao e totalmente independente: o CatWISE usa as mesmas exposicoes de 2010 no
+    ajuste do movimento. Mas o AllWISE e outra reducao (outro pipeline, so a epoca
+    antiga), entao pega PM espurio de casamento errado entre epocas. Se o PM do CatWISE for real, a fonte tem de estar no AllWISE na posicao recuada
     pelo PM, e nao na atual. O AllWISE e mais raso (W2 ~ 15,6 contra ~ 16,8): candidato
     fraco quase sempre cai em 'sem fonte', o que nao prova nada.
     Precisa de: source_id, ra, dec, pmra, pmdec, meanobsmjd.

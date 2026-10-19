@@ -27,8 +27,7 @@ import config
 from app import dados
 
 CAMADAS = (
-    ("unwise-neo2", "unWISE NEO2 (infravermelho)"),
-    ("unwise-neo7", "unWISE NEO7 (infravermelho)"),
+    ("unwise-neo7", "unWISE NEO7 (infravermelho, 2010 a 2020 empilhado)"),
     ("ls-dr10", "Legacy Surveys DR10 (grz)"),
 )
 PASTA_SAIDA = ROOT / "data" / "relatorio"

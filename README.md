@@ -52,7 +52,7 @@ python -c "import sqlite3, pandas as pd; print(pd.read_sql('SELECT source_id, ra
 **O que fazer com o resultado**
 
 A lista é de *suspeitos*, não de descobertas. O caminho depois dela:
-1. **Olhar as imagens** dos suspeitos, começando pelos que o AllWISE mostra se movendo (a nota da IA é só um comentário). O app `app/revisao.py` (veja [Como usar](#como-usar)) mostra os recortes de cada suspeito e grava sua decisão. O que se quer ver é um ponto real no céu que **mude de lugar** entre fotos de épocas diferentes. Ferramentas como o [WiseView](http://byw.tools/wiseview) mostram isso em animação.
+1. **Olhar as imagens** dos suspeitos, começando pelos que o AllWISE mostra se movendo (a nota da IA é só um comentário). O app `app/revisao.py` (veja [Como usar](#como-usar)) mostra os recortes de cada suspeito e grava sua decisão. Os recortes mostram se há um objeto real ali, mas não o movimento: a imagem do infravermelho empilha 10 anos de fotos. O movimento se vê no [WiseView](http://byw.tools/wiseview), que anima as épocas, e no teste do AllWISE.
 2. **Descartar os falsos alarmes.** Na prática, quase todos caem aqui: ruído, defeito do instrumento ou ponto mal medido.
 3. **Levar os que sobrarem a um astrônomo**, que pode confirmar com outras observações (um espectro, por exemplo) e, se for novo de verdade, publicar.
 
@@ -80,7 +80,7 @@ A lista é de *suspeitos*, não de descobertas. O caminho depois dela:
 
 ![Casos de confirmar](docs/img/ref_confirmar.jpg)
 
-Em cada linha: unWISE NEO2, unWISE NEO7 e óptico (Legacy Surveys). As três primeiras linhas desta folha são exemplos de **confirmar**.
+Em cada linha: infravermelho (unWISE NEO7) e óptico (Legacy Surveys). As três primeiras linhas desta folha são exemplos de **confirmar**.
 
 1. **Anã L5 conhecida.** Bolha nítida no infravermelho e um ponto vermelho no óptico, os dois na mira.
 2. **Anã T7 conhecida.** Bolha alaranjada no infravermelho, na borda da mira (o objeto andou desde 2015) e nada no óptico naquela posição. O ponto vermelho à direita, no óptico, é outra fonte.
@@ -104,7 +104,7 @@ Em cada linha: unWISE NEO2, unWISE NEO7 e óptico (Legacy Surveys). As três pri
 
 ![Exemplo real: uma anã L já conhecida (embaixo) e um falso alarme (em cima)](docs/img/resultado_exemplo.jpg)
 
-*Cada linha tem 3 recortes de 60" x 60" (unWISE em dois empilhamentos, NEO2 e NEO7, e Legacy Surveys no óptico). Embaixo, a anã L2 já catalogada 2MASS J09585080+2001525: nítida no infravermelho e vermelha no óptico. Em cima, um suspeito que a IA chegou a marcar como `alta`: quase nada aparece no centro, sinal de falso alarme. Imagens: unWISE (NASA/WISE) e Legacy Surveys (DESI), via visualizador do Legacy Surveys.*
+*Cada linha tem 2 recortes de 60" x 60": infravermelho (unWISE NEO7) e óptico (Legacy Surveys). Embaixo, a anã L2 já catalogada 2MASS J09585080+2001525: nítida no infravermelho e vermelha no óptico. Em cima, um suspeito que a IA chegou a marcar como `alta`: quase nada aparece no centro, sinal de falso alarme. Imagens: unWISE (NASA/WISE) e Legacy Surveys (DESI), via visualizador do Legacy Surveys.*
 
 ## Contexto científico
 

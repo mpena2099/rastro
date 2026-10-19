@@ -1,7 +1,7 @@
 """Gera as folhas de referencia da revisao visual (docs/img/ref_*.jpg).
 
-Cada linha mostra um caso nos mesmos 3 recortes do app (unWISE NEO2, unWISE NEO7
-e Legacy Surveys DR10). Os casos "conhecida" sao anas L/T/Y ja catalogadas; os
+Cada linha mostra um caso nos mesmos 2 recortes do app (unWISE NEO7 e Legacy
+Surveys DR10). Os casos "conhecida" sao anas L/T/Y ja catalogadas; os
 demais sao candidatos reais da varredura de RA 148 a 153, Dec +18 a +23,
 classificados a olho. Usa rede (Legacy Surveys). Rodar da raiz do repositorio:
 
@@ -20,7 +20,7 @@ from PIL import Image, ImageDraw
 
 from app import dados
 
-CAMADAS = ["unwise-neo2", "unwise-neo7", "ls-dr10"]
+CAMADAS = ["unwise-neo7", "ls-dr10"]
 LADO = 280
 
 # (ra, dec, rotulo)
@@ -67,7 +67,7 @@ def recorte(ra: float, dec: float, camada: str) -> Image.Image:
 
 def folha(casos, destino: Path):
     faixa = 22
-    folha = Image.new("RGB", (3 * LADO + 8, len(casos) * (LADO + faixa + 4)), (0, 0, 0))
+    folha = Image.new("RGB", (len(CAMADAS) * (LADO + 4) - 4, len(casos) * (LADO + faixa + 4)), (0, 0, 0))
     d = ImageDraw.Draw(folha)
     for i, (ra, dec, rotulo) in enumerate(casos):
         y = i * (LADO + faixa + 4)
