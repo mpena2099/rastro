@@ -71,6 +71,50 @@ def link_wiseview(ra: float, dec: float) -> str:
     return f"http://byw.tools/wiseview#ra={ra}&dec={dec}&size=100&band=2"
 
 
+# Descricao de catalogo VizieR que indica lista de anas frias ou de movimento proprio: e onde
+# um candidato "novo" pode ja estar publicado sem o SIMBAD saber (caso do Karpov+2025)
+PALAVRAS_ANAS = ("dwarf", "brown", "ultracool", "ultra-cool", "proper motion", "proper-motion",
+                 "low-mass", "motion")
+
+
+def eh_lista_de_anas(descricao: str) -> bool:
+    d = descricao.lower()
+    return "white dwarf" not in d and any(p in d for p in PALAVRAS_ANAS)
+
+
+def buscar_vizier(ra: float, dec: float, pm_total: float) -> pd.DataFrame:
+    """Todos os catalogos do VizieR perto do candidato, com a distancia da fonte mais proxima.
+
+    O raio cobre o quanto o objeto andou entre J2000 e a epoca do CatWISE (~2015), porque cada
+    catalogo usa a sua epoca. Leva de 20 s a 1 min (consulta o VizieR inteiro).
+    """
+    import astropy.units as u
+    from astropy.coordinates import SkyCoord
+    from astroquery.vizier import Vizier
+
+    raio = max(10.0, 16 * float(pm_total) + 5)
+    res = Vizier(columns=["_r"], row_limit=5, timeout=180).query_region(
+        SkyCoord(ra, dec, unit="deg"), radius=raio * u.arcsec)
+    linhas = []
+    for nome in res.keys():
+        t = res[nome]
+        descricao = str(t.meta.get("description", ""))
+        linhas.append({"catalogo": nome, "descricao": descricao,
+                       "dist_arcsec": float(np.min(t["_r"])) if "_r" in t.colnames else np.nan,
+                       "lista_anas": eh_lista_de_anas(descricao)})
+    df = pd.DataFrame(linhas, columns=["catalogo", "descricao", "dist_arcsec", "lista_anas"])
+    return df.sort_values(["lista_anas", "dist_arcsec"], ascending=[False, True]).reset_index(drop=True)
+
+
+def resumo_vizier(achados: pd.DataFrame) -> str:
+    """Texto curto: as listas de anas/movimento proprio encontradas, ou que nao ha nenhuma."""
+    anas = achados[achados["lista_anas"]]
+    if anas.empty:
+        return f"nenhuma lista de anas ou de movimento proprio ({len(achados)} catalogos gerais)"
+    return "; ".join(f"{a.catalogo} ({a.descricao[:60]}) a {a.dist_arcsec:.1f}\""
+                     for a in anas.itertuples())
+
+
 def cruzar_gaia_ps1(df: pd.DataFrame) -> pd.DataFrame:
     """Marca candidatos com contraparte no Gaia DR3 (3") e no Pan-STARRS (2").
 

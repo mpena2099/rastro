@@ -93,6 +93,7 @@ def _bloco(x, imagens: dict) -> str:
     deslocamento esperado {_fmt(x.allwise_desloc_esperado)}&Prime;)</td></tr>
 <tr><th>Gaia DR3 (3&Prime;)</th><td>{gaia}</td><th>Pan-STARRS (2&Prime;)</th><td>{ps1}</td></tr>
 <tr><th>SIMBAD e listas de anas</th><td colspan="3">sem objeto conhecido a {config.SIMBAD_RADIUS_ARCSEC}&Prime;</td></tr>
+<tr><th>VizieR inteiro</th><td colspan="3">{esc(str(getattr(x, "vizier", "nao consultado")))}</td></tr>
 </table>
 {nota}
 <p class="links"><a href="{esc(dados.link_wiseview(x.ra, x.dec))}">WiseView</a> &middot;
@@ -153,11 +154,15 @@ def completar_colunas(sel: pd.DataFrame) -> pd.DataFrame:
 def gerar_html(sel: pd.DataFrame) -> str:
     """Baixa os recortes e monta a pagina. `sel` ja traz os cruzamentos (Gaia/PS1/AllWISE)."""
     sel = completar_colunas(sel)
-    imagens = {}
+    imagens, vizier = {}, []
     for x in sel.itertuples():
-        print(f"  recortes de {x.source_id}")
+        print(f"  recortes e VizieR de {x.source_id}")
         imagens[x.source_id] = {c: baixar_recorte(x.ra, x.dec, c) for c, _ in CAMADAS}
-    return montar_html(sel, imagens)
+        try:
+            vizier.append(dados.resumo_vizier(dados.buscar_vizier(x.ra, x.dec, x.pm_total)))
+        except Exception as e:
+            vizier.append(f"consulta falhou: {str(e)[:80]}")
+    return montar_html(sel.assign(vizier=vizier), imagens)
 
 
 def run(incluir_duvidas: bool = False) -> Path | None:

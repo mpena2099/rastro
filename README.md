@@ -194,6 +194,7 @@ Na barra lateral:
 - **Situação:** pendentes, confirmados, dúvidas, descartados ou todos, cada um com a contagem. É por aqui que se revê o que já foi classificado.
 - **Buscar por código:** acha qualquer candidato pelo código (ou pelo final dele), em qualquer situação.
 - **Filtros** de Gaia, Pan-STARRS, movimento no AllWISE, PM/σ mínimo e nota da IA, e a **ordenação**.
+- **Já foi publicado?** Um botão consulta o VizieR inteiro em volta do candidato e destaca os catálogos de anãs ou de movimento próprio, com a distância. A Fase 4 só cruza as listas conhecidas, e é assim que se acha um catálogo novo que ainda não entrou nelas. Use antes de confirmar. O relatório da Fase 7 faz a mesma busca para cada candidato.
 - **Relatório (Fase 7):** o botão "Gerar relatório" monta uma página HTML com os confirmados (ou confirmados e dúvidas, se marcar a caixa) e o botão "Baixar relatório" entrega o arquivo. Leva alguns segundos por candidato, para baixar os recortes.
 - No corpo da página, o quadro "Fila completa" lista a fila, e um clique numa linha abre aquele candidato.
 
@@ -241,7 +242,35 @@ Esta é a única fase que precisa de chave. É **provider-agnóstico**: fala o f
 - **Alternativa sem cota diária** (pra iterar bastante): **Zhipu GLM-4.7-Flash**, perpetuamente free (exemplo pronto no `config.py`).
 - **Zero cota / offline**: Ollama local.
 
-A chave é resolvida por `load_api_key()`: primeiro a env var (ex: `export GROQ_API_KEY=...`), senão o arquivo `~/.local/share/opencode/auth.json` (campo `<provider>.key`). O projeto não lê arquivo `.env`.
+### Configurar a chave do Groq, passo a passo
+
+1. Crie uma conta em [console.groq.com](https://console.groq.com) (entra com Google ou GitHub, sem cartão).
+2. No menu **API Keys**, clique em **Create API Key** e copie a chave (começa com `gsk_`). Ela só aparece uma vez; se perder, crie outra.
+3. Guarde a chave numa variável de ambiente, que é de onde o projeto a lê. Para valer em todo terminal novo:
+
+   ```bash
+   echo 'export GROQ_API_KEY="gsk_cole_a_sua_chave_aqui"' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+   Não coloque a chave em `config.py` nem em nenhum arquivo do repositório: ela iria parar no git.
+4. Teste a chave. Se aparecer uma lista de modelos, está certa; `Invalid API Key` quer dizer chave errada ou incompleta:
+
+   ```bash
+   curl -s https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY" | head -c 300
+   ```
+
+5. Rode só a Fase 5 (as fases 1 a 4 precisam já ter rodado):
+
+   ```bash
+   python -u -c "from src.llm_triage import run; run()"
+   ```
+
+**Quando a cota acaba.** A Fase 5 tria os `LLM_BATCH_SIZE` (60) candidatos de maior movimento próprio, com uma pausa de `LLM_REQUEST_DELAY_S` (8 s) entre chamadas para respeitar o limite por minuto. Se o limite por minuto estourar, ela espera e tenta de novo sozinha. Se a **cota diária** acabar, cada chamada restante falha na hora com a mensagem "cota diaria do free tier esgotada" e o candidato fica com score `erro`. Aí há três saídas: esperar o reset (no dia seguinte, no fuso do Groq), trocar `LLM_MODEL` por outro modelo do Groq (a cota é separada por modelo) ou usar um dos outros provedores abaixo.
+
+**Outro provedor.** Mude em `config.py` as linhas `LLM_BASE_URL`, `LLM_MODEL` e `LLM_API_KEY_ENV` (há exemplos prontos comentados para Gemini, OpenRouter, Zhipu e Ollama) e exporte a chave com o nome que você pôs em `LLM_API_KEY_ENV`. Com Ollama local, use `LLM_API_KEY_ENV = None`: não há chave.
+
+A chave é lida por `load_api_key()` da variável em `LLM_API_KEY_ENV`. Se a variável não existir, há um segundo lugar, conveniente para quem usa o OpenCode: o arquivo `~/.local/share/opencode/auth.json` (campo `<provider>.key`). O projeto não lê arquivo `.env`.
 
 A triagem pode usar **saída estruturada** (`response_format` json_schema, `LLM_STRUCTURED=True`), mas o default é o modo texto: o `gpt-oss-20b` no Groq falha o JSON em boa parte das chamadas. Se o modelo rejeitar o formato, cai no modo texto e lê o veredito da resposta. Resposta vazia vira `erro`, nunca um score. Regra do score: **`alta` só sai de um veredito explícito do modelo**; heurística por palavra-chave só rebaixa, nunca promove, pra não gerar falso positivo.
 

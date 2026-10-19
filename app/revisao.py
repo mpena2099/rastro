@@ -77,6 +77,11 @@ def _recorte(ra: float, dec: float, camada: str):
     return img
 
 
+@st.cache_data(show_spinner="Consultando o VizieR inteiro (20 s a 1 min)...")
+def vizier(ra: float, dec: float, pm_total: float) -> pd.DataFrame:
+    return dados.buscar_vizier(ra, dec, pm_total)
+
+
 @st.cache_data(show_spinner="Cruzando com Gaia, Pan-STARRS e AllWISE (uma vez)...")
 def cruzamentos(df: pd.DataFrame):
     out, erros = df[["source_id"]].copy(), []
@@ -279,6 +284,23 @@ st.caption("Recortes de 60\" x 60\", norte pra cima e leste à esquerda. A mira 
 
 st.markdown(f"[Abrir no Legacy Surveys]({dados.link_legacy_viewer(r['ra'], r['dec'])})  |  "
             f"[Abrir no WiseView (movimento em épocas)]({dados.link_wiseview(r['ra'], r['dec'])})")
+
+with st.expander("Já foi publicado? (busca no VizieR inteiro)"):
+    st.caption("A Fase 4 já cruza o SIMBAD e as listas de anãs de `CATALOGOS_ANAS`. Esta busca "
+               "olha todos os catálogos do VizieR, e é como se acha um catálogo novo que ainda não "
+               "entrou na lista. Faça antes de confirmar um candidato.")
+    if st.button("Buscar no VizieR", key=f"vizier_{sid}"):
+        try:
+            achados = vizier(float(r["ra"]), float(r["dec"]), float(r["pm_total"]))
+            anas = achados[achados["lista_anas"]]
+            if anas.empty:
+                st.success(dados.resumo_vizier(achados))
+            else:
+                st.warning(f"Aparece em {len(anas)} lista(s) de anãs ou de movimento próprio. "
+                           "Confira se é o mesmo objeto (distância pequena) antes de confirmar.")
+            st.dataframe(achados, hide_index=True, width="stretch")
+        except Exception as e:
+            st.error(f"VizieR falhou: {e}")
 
 with st.expander(f"Nota da LLM: {r['llm_triage_score']}"):
     st.write(r["llm_triage_notes"] if pd.notna(r["llm_triage_notes"]) else "Sem triagem da LLM.")

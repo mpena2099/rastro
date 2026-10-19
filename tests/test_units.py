@@ -128,6 +128,19 @@ def test_marcar_catalogos():
     assert out["catalogo_match"].tolist()[:2] == ["Karpov+2025 (unTimely)", None]
 
 
+def test_lista_de_anas():
+    from app.dados import eh_lista_de_anas, resumo_vizier
+    assert eh_lista_de_anas("New high-proper-motion objects detected in this work")
+    assert eh_lista_de_anas("New L, T, and Y dwarf candidates")
+    assert not eh_lista_de_anas("Gaia EDR3 white dwarf candidates")
+    assert not eh_lista_de_anas("the CatWISE2020 catalog")
+    achados = pd.DataFrame({"catalogo": ["II/365/catwise", "J/A+A/695/A195/table2"],
+                            "descricao": ["the CatWISE2020 catalog", "New high-proper-motion objects"],
+                            "dist_arcsec": [0.1, 0.18], "lista_anas": [False, True]})
+    assert "J/A+A/695/A195/table2" in resumo_vizier(achados) and "0.2\"" in resumo_vizier(achados)
+    assert resumo_vizier(achados[~achados["lista_anas"]]).startswith("nenhuma lista")
+
+
 def test_url_recorte():
     from app import dados
     u = dados.url_recorte(150.0, 20.0, "unwise-neo2")
