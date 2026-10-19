@@ -276,7 +276,9 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
 │   ├── relatorio.py         # Fase 7: relatorio dos confirmados (HTML, e CSV pela linha de comando)
 │   └── proper_motion.py     # util (pm_total, cor_w1w2)
 ├── tools/
-│   └── recall_conhecidas.py # mede o recall dos cortes contra anas conhecidas
+│   ├── recall_conhecidas.py # mede o recall dos cortes contra anas conhecidas
+│   ├── gerar_referencias.py # folhas de referencia da revisao (docs/img/ref_*.jpg)
+│   └── gerar_funil.py       # grafico do funil (docs/img/funil_fases.png), lido do banco
 ├── app/
 │   ├── revisao.py           # Fase 6: app Streamlit de revisao visual
 │   └── dados.py             # leitura/gravacao das revisoes e URLs dos recortes
