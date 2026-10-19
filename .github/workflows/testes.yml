@@ -1,0 +1,18 @@
+name: testes
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unidade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - run: pip install -r requirements.txt
+      # testes offline: a Fase 1 (sanity check) depende de rede e fica fora do CI
+      - run: python -W ignore tests/test_units.py

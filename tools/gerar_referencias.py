@@ -28,7 +28,8 @@ CASOS = {
     "confirmar": [
         (52.16177, 1.92045, "Conhecida: ana L5 (WISEA J0328+0155)"),
         (247.162496, 23.138284, "Conhecida: ana T7 (2MASS J1628+2308)"),
-        (150.318181, 18.670468, "Suspeito do campo: ponto vermelho na mira"),
+        # candidato confirmado fica fora do repositorio publico ate a segunda opiniao
+        (149.711708, 20.03125, "Conhecida: ana L2 (2MASS J0958+2001)"),
     ],
     "duvida": [
         (113.680876, -71.962338, "Conhecida: ana Y0 (WISE J0734-7157)"),

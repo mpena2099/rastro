@@ -1,10 +1,16 @@
 # Rastro
 
+[![testes](https://github.com/mpena2099/rastro/actions/workflows/testes.yml/badge.svg)](https://github.com/mpena2099/rastro/actions/workflows/testes.yml)
+
 Pipeline pessoal de mineração de dados astronômicos que caça **anãs marrons e estrelas frias próximas ao Sol** ainda não catalogadas, procurando por **movimento próprio anômalo** no catálogo público **CatWISE2020**.
 
 ![Ilustração artística de uma anã marrom](docs/img/eso1404c.jpg)
 
 *Ilustração artística de uma anã marrom (Luhman 16B), parte do terceiro sistema mais próximo do Sol. Crédito: ESO/I. Crossfield/N. Risinger (skysurvey.org), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).*
+
+## English summary
+
+Rastro is a personal data-mining pipeline that hunts for **uncatalogued brown dwarfs and cool stars near the Sun** through **high proper motion** in the public **CatWISE2020** catalogue (queried via IRSA TAP). Five automated phases share state through SQLite: a sanity check that recovers Luhman 16 and compares its measured proper motion, a tiled field download with server-side cuts, quality filtering (proper-motion significance, W2 SNR, contamination flags, pmcode), removal of known objects by SIMBAD cross-match, and an LLM triage that only ranks, never decides. Two manual phases follow: a local Streamlit app for visual review (unWISE and Legacy Surveys cutouts, Gaia/Pan-STARRS counterparts, and a consistency test of the motion against AllWISE positions) and an HTML report for a second opinion. Recall against 949 known L/T/Y dwarfs from SIMBAD is about 76%. A 25 deg² scan (RA 148-153, Dec +18 to +23) left 239 candidates under review; no discovery is claimed. Code and docs are in Portuguese; `config.py` holds every parameter. Run with `python pipeline.py`; offline tests with `python tests/test_units.py`.
 
 ## Em palavras simples
 
@@ -84,7 +90,7 @@ Em cada linha: infravermelho (unWISE NEO7) e óptico (Legacy Surveys). As três 
 
 1. **Anã L5 conhecida.** Bolha nítida no infravermelho e um ponto vermelho no óptico, os dois na mira.
 2. **Anã T7 conhecida.** Bolha alaranjada no infravermelho, na borda da mira (o objeto andou desde 2015) e nada no óptico naquela posição. O ponto vermelho à direita, no óptico, é outra fonte.
-3. **Suspeito do campo.** Bolha nítida no infravermelho e um pontinho vermelho exatamente na mira (cor W1-W2 0,56). É o tipo de caso que vale levar ao WiseView.
+3. **Anã L2 conhecida, do próprio campo varrido.** Bolha nítida no infravermelho e um pontinho vermelho no óptico, os dois logo abaixo da mira: a posição do catálogo é de 2000 e o objeto andou desde então. Um suspeito com essa cara vale levar ao WiseView.
 
 *Dúvida*
 
