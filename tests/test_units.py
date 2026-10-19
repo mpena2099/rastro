@@ -118,6 +118,16 @@ def test_revisao_humana_persiste_e_valida():
         pass
 
 
+def test_marcar_catalogos():
+    from src.known_catalog_match import marcar_catalogos
+    df = pd.DataFrame({"source_id": ["a", "b", "c"],
+                       "status": ["candidato", "conhecido", "candidato"]})
+    out = marcar_catalogos(df, {"a": "Karpov+2025 (unTimely)", "b": "X"})
+    assert out["status"].tolist() == ["conhecido", "conhecido", "candidato"]
+    # so rebaixa candidato; quem o SIMBAD ja marcou fica sem catalogo_match
+    assert out["catalogo_match"].tolist()[:2] == ["Karpov+2025 (unTimely)", None]
+
+
 def test_url_recorte():
     from app import dados
     u = dados.url_recorte(150.0, 20.0, "unwise-neo2")

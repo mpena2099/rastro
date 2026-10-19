@@ -6,7 +6,8 @@ from astropy.table import Table
 from astroquery.xmatch import XMatch
 import astropy.units as u
 
-from config import SQLITE_PATH, SIMBAD_RADIUS_ARCSEC, SIMBAD_DELAY_S
+from config import (CATALOGOS_ANAS, CATALOGOS_RAIO_ARCSEC, SQLITE_PATH, SIMBAD_RADIUS_ARCSEC,
+                    SIMBAD_DELAY_S)
 
 
 MJD_J2000 = 51544.5
@@ -21,6 +22,46 @@ def posicao_j2000(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     dec = df["dec"] - df["pmdec"] * dt_anos / 3600.0
     ra = df["ra"] - df["pmra"] * dt_anos / 3600.0 / np.cos(np.radians(df["dec"]))
     return ra % 360.0, dec
+
+
+def marcar_catalogos(df: pd.DataFrame, achados: dict[str, str]) -> pd.DataFrame:
+    """Marca como conhecido o candidato que aparece numa lista de anas (source_id -> nome)."""
+    df = df.copy()
+    if "catalogo_match" not in df:
+        df["catalogo_match"] = None
+    mask = (df["status"] == "candidato") & df["source_id"].isin(achados)
+    df.loc[mask, "catalogo_match"] = df.loc[mask, "source_id"].map(achados)
+    df.loc[mask, "status"] = "conhecido"
+    return df
+
+
+def _cruzar_catalogos(df: pd.DataFrame) -> pd.DataFrame:
+    cand = df[df["status"] == "candidato"]
+    if cand.empty:
+        return marcar_catalogos(df, {})
+    print(f"\nCruzando {len(cand)} candidatos com {len(CATALOGOS_ANAS)} listas de anas (VizieR)...")
+    ra2000, dec2000 = posicao_j2000(cand)
+    posicoes = ((cand["ra"], cand["dec"]), (ra2000, dec2000))
+    achados = {}
+    for tabela, nome in CATALOGOS_ANAS.items():
+        ids = set()
+        try:
+            for ra, dec in posicoes:
+                t = Table({"source_id": cand["source_id"].values, "ra": ra.values,
+                           "dec": dec.values})
+                r = XMatch.query(cat1=t, cat2=f"vizier:{tabela}",
+                                 max_distance=CATALOGOS_RAIO_ARCSEC * u.arcsec,
+                                 colRA1="ra", colDec1="dec")
+                ids |= {str(s) for s in r["source_id"]}
+        except Exception as e:
+            # uma lista fora do ar nao derruba a fase; o SIMBAD ja filtrou o grosso
+            print(f"  AVISO {nome}: {str(e)[:100]}")
+            continue
+        for s in ids:
+            achados.setdefault(s, nome)
+        if ids:
+            print(f"  {nome}: {len(ids)}")
+    return marcar_catalogos(df, achados)
 
 
 def run():
@@ -78,10 +119,16 @@ def run():
             df_result.loc[mask, "simbad_match_id"] = simbad_id
             df_result.loc[mask, "status"] = "conhecido"
 
+    return _gravar(df_result)
+
+
+def _gravar(df_result: pd.DataFrame) -> pd.DataFrame:
+    df_result = _cruzar_catalogos(df_result)
     conhecidos = df_result[df_result["status"] == "conhecido"]
     candidatos = df_result[df_result["status"] == "candidato"]
 
-    print(f"\nConhecidos (descartados): {len(conhecidos)}")
+    print(f"\nConhecidos (descartados): {len(conhecidos)} "
+          f"({conhecidos['catalogo_match'].notna().sum()} so nas listas de anas)")
     print(f"Candidatos (seguem): {len(candidatos)}")
 
     conn = sqlite3.connect(str(SQLITE_PATH))
@@ -132,9 +179,8 @@ def _fallback_sequential(df):
         df_result.at[idx, "simbad_match_id"] = mid
         df_result.at[idx, "status"] = "conhecido"
 
-    df_result.to_sql("candidatos_fase4", conn, if_exists="replace", index=False)
     conn.close()
-    return df_result
+    return _gravar(df_result)
 
 
 if __name__ == "__main__":

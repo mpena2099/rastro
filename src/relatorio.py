@@ -92,7 +92,7 @@ def _bloco(x, imagens: dict) -> str:
     (fonte a {_fmt(x.allwise_sep_prevista)}&Prime; da posicao prevista e a {_fmt(x.allwise_sep_atual)}&Prime; da atual;
     deslocamento esperado {_fmt(x.allwise_desloc_esperado)}&Prime;)</td></tr>
 <tr><th>Gaia DR3 (3&Prime;)</th><td>{gaia}</td><th>Pan-STARRS (2&Prime;)</th><td>{ps1}</td></tr>
-<tr><th>SIMBAD</th><td colspan="3">sem objeto conhecido a {config.SIMBAD_RADIUS_ARCSEC}&Prime;</td></tr>
+<tr><th>SIMBAD e listas de anas</th><td colspan="3">sem objeto conhecido a {config.SIMBAD_RADIUS_ARCSEC}&Prime;</td></tr>
 </table>
 {nota}
 <p class="links"><a href="{esc(dados.link_wiseview(x.ra, x.dec))}">WiseView</a> &middot;
@@ -121,7 +121,8 @@ th,td{{border:1px solid #ccc;padding:.25rem .5rem;text-align:left;font-size:.9re
 <p>Fonte: CatWISE2020 (IRSA/TAP), regiao RA {config.FIELD_RA_RANGE[0]:g}-{config.FIELD_RA_RANGE[1]:g},
 Dec {config.FIELD_DEC_RANGE[0]:g}-{config.FIELD_DEC_RANGE[1]:g}. Cortes: mov. proprio &gt; {config.PM_THRESHOLD_ARCSEC}&Prime;/ano,
 PM/&sigma; &ge; {config.PM_SIGNIF_MIN:g}, SNR W2 &ge; {config.W2SNR_MIN:g}, sem troca de primaria no pmcode,
-sem flags de contaminacao, no maximo {config.N_AW_MAX} fonte(s) AllWISE no casamento. Sem objeto conhecido no SIMBAD.
+sem flags de contaminacao, no maximo {config.N_AW_MAX} fonte(s) AllWISE no casamento. Sem objeto conhecido no SIMBAD
+nem em {len(config.CATALOGOS_ANAS)} listas de anas frias do VizieR ({html.escape(", ".join(sorted(set(config.CATALOGOS_ANAS.values()))))}).
 Cada candidato foi conferido a olho nos recortes e submetido ao teste de movimento contra o AllWISE (epoca ~2010).</p>
 <h2>O que o relatorio NAO afirma</h2>
 <p>Sao candidatos, nao descobertas. Falta espectro ou fotometria adicional para confirmar a classe espectral.

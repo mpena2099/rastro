@@ -59,6 +59,24 @@ N_AW_MAX = 1
 # Fase 4 — cross-match
 SIMBAD_RADIUS_ARCSEC = 5
 SIMBAD_DELAY_S = 0.3
+# Listas de anas frias no VizieR (via CDS XMatch) que o SIMBAD nao cobre por inteiro:
+# Karpov+2025 trouxe 2 dos 239 candidatos da varredura, um deles ja confirmado a olho.
+# Cada uma e cruzada na posicao J2000 e na da epoca do CatWISE (as epocas variam).
+# J/ApJ/899/123 (Meisner+2020b) nao esta no servidor do XMatch.
+CATALOGOS_ANAS = {
+    "J/A+A/695/A195/table2": "Karpov+2025 (unTimely)",
+    "J/ApJS/253/7/tablea1": "Kirkpatrick+2021 (20 pc)",
+    "J/ApJS/253/7/table1": "Kirkpatrick+2021 (novas L/T/Y)",
+    "J/ApJS/271/55/table2": "Kirkpatrick+2024 (20 pc)",
+    "J/ApJ/889/74/bdcand": "Meisner+2020 (Backyard Worlds)",
+    "J/ApJS/234/1/dwarfs": "Best+2018 (Pan-STARRS)",
+    "J/A+A/619/L8/table2": "Reyle 2018 (Gaia DR2)",
+    "J/MNRAS/485/4423/table3": "Smart+2019 (Gaia DR2)",
+    "J/A+A/589/A49/table3": "Skrzypek+2016 (L)",
+    "J/A+A/589/A49/table4": "Skrzypek+2016 (T)",
+    "J/MNRAS/489/5301/desy3-lt": "Carnero Rosell+2019 (DES)",
+}
+CATALOGOS_RAIO_ARCSEC = 5
 
 # Fase 5 — LLM triage (provider-agnostico, endpoint OpenAI-compativel)
 #

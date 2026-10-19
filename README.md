@@ -10,7 +10,7 @@ Pipeline pessoal de mineração de dados astronômicos que caça **anãs marrons
 
 ## English summary
 
-Rastro is a personal data-mining pipeline that hunts for **uncatalogued brown dwarfs and cool stars near the Sun** through **high proper motion** in the public **CatWISE2020** catalogue (queried via IRSA TAP). Five automated phases share state through SQLite: a sanity check that recovers Luhman 16 and compares its measured proper motion, a tiled field download with server-side cuts, quality filtering (proper-motion significance, W2 SNR, contamination flags, pmcode), removal of known objects by SIMBAD cross-match, and an LLM triage that only ranks, never decides. Two manual phases follow: a local Streamlit app for visual review (unWISE and Legacy Surveys cutouts, Gaia/Pan-STARRS counterparts, and a consistency test of the motion against AllWISE positions) and an HTML report for a second opinion. Recall against 949 known L/T/Y dwarfs from SIMBAD is about 76%. A 25 deg² scan (RA 148-153, Dec +18 to +23) left 239 candidates under review; no discovery is claimed. Code and docs are in Portuguese; `config.py` holds every parameter. Run with `python pipeline.py`; offline tests with `python tests/test_units.py`.
+Rastro is a personal data-mining pipeline that hunts for **uncatalogued brown dwarfs and cool stars near the Sun** through **high proper motion** in the public **CatWISE2020** catalogue (queried via IRSA TAP). Five automated phases share state through SQLite: a sanity check that recovers Luhman 16 and compares its measured proper motion, a tiled field download with server-side cuts, quality filtering (proper-motion significance, W2 SNR, contamination flags, pmcode), removal of known objects by cross-match with SIMBAD and 11 VizieR lists of ultracool dwarfs, and an LLM triage that only ranks, never decides. Two manual phases follow: a local Streamlit app for visual review (unWISE and Legacy Surveys cutouts, Gaia/Pan-STARRS counterparts, and a consistency test of the motion against AllWISE positions) and an HTML report for a second opinion. Recall against 949 known L/T/Y dwarfs from SIMBAD is about 76%. A 25 deg² scan (RA 148-153, Dec +18 to +23) left 237 candidates under review. The best one turned out to be already published as a photometric L5 candidate (Karpov et al. 2025), found independently; no discovery is claimed. Code and docs are in Portuguese; `config.py` holds every parameter. Run with `python pipeline.py`; offline tests with `python tests/test_units.py`.
 
 ## Em palavras simples
 
@@ -31,14 +31,14 @@ Rastro is a personal data-mining pipeline that hunts for **uncatalogued brown dw
 1. **Confere as ferramentas.** Procura dois objetos famosos que já se conhece. Se não os achar, algo está errado e o programa para.
 2. **Baixa um pedaço do céu.** Hoje, 25 graus quadrados (quadrados de 1 grau por 1 grau, cada um com cerca de 5 vezes a área da Lua cheia), só com pontos que se movem rápido.
 3. **Joga fora medidas duvidosas.** Defeitos do instrumento, pontos colados em vizinhos e movimentos pequenos demais pra distinguir de erro de medida.
-4. **Joga fora o que já é conhecido.** Compara com o SIMBAD, o grande cadastro de objetos astronômicos.
+4. **Joga fora o que já é conhecido.** Compara com o SIMBAD, o grande cadastro de objetos astronômicos, e com listas publicadas de anãs frias que o SIMBAD ainda não absorveu.
 5. **Pede a nota de uma IA.** Uma IA lê os números de cada sobrevivente e dá uma nota de prioridade. Ela só ajuda a ordenar, nunca decide.
 6. **Olhar humano.** As imagens de cada suspeito são conferidas à mão, num app local (`streamlit run app/revisao.py`) que mostra os recortes, os números e a nota da IA, e guarda a sua decisão.
 7. **Relatório pra um astrônomo.** Os candidatos que você confirmou saem numa página só, com imagens e números, prontos pra pedir uma segunda opinião. A opinião em si ainda está por fazer.
 
 ![Quantas fontes sobram em cada fase](docs/img/funil_fases.png)
 
-**O que esperar:** quase tudo que passa pela peneira é falso alarme ou já era conhecido, e isso é normal até em projetos profissionais. No campo de teste, o programa reencontrou sozinho uma anã marrom que já estava catalogada, sinal de que os filtros funcionam. Na varredura de 25 graus quadrados sobraram 239 candidatos, e ainda não há lista curta e defensável: falta a confirmação visual. Uma descoberta nova é o horizonte, não a promessa.
+**O que esperar:** quase tudo que passa pela peneira é falso alarme ou já era conhecido, e isso é normal até em projetos profissionais. No campo de teste, o programa reencontrou sozinho uma anã marrom que já estava catalogada, sinal de que os filtros funcionam. Na varredura de 25 graus quadrados sobraram 237 candidatos, e ainda não há lista curta e defensável: falta a confirmação visual. O melhor suspeito confirmado a olho já tinha sido publicado em 2025 como candidata a anã L5 (Karpov et al.), achado de forma independente: os filtros apontam pro lugar certo, mas a concorrência é real. Uma descoberta nova é o horizonte, não a promessa.
 
 ## O que entra, o que sai e o que fazer com isso
 
@@ -152,7 +152,7 @@ Fases sequenciais. Cada uma lê a tabela produzida pela anterior no SQLite e gra
 | 1 | **Teste de sanidade**: redescobre Luhman 16 (PM ~2,7"/ano) e WISE 0855 (PM ~8"/ano) via CatWISE2020 + SIMBAD. Se Luhman 16 falhar, o pipeline aborta, porque não faz sentido caçar objetos novos com uma stack que não acha os conhecidos. WISE 0855 só gera aviso | ✅ |
 | 2 | **Query ao CatWISE2020** (ADQL/TAP) numa região do céu, varrida em ladrilhos de 1 grau (um ladrilho que estoura o limite de linhas é dividido em 4), filtrando no servidor por movimento próprio, astrometria (ka=km=3) e qualidade de W2 (SNR e flag). Sem corte em W1: anãs Y são fracas nessa banda | ✅ |
 | 3 | **Filtragem fina de qualidade**: remove contaminação/artefatos por `cc_flags`/`ab_flags`, troca do componente principal (`pmcode` B=N), confusão de fontes (`n_aw`) e movimento próprio pouco significativo (PM/σ < 8) | ✅ |
-| 4 | **Cross-match contra SIMBAD** (via CDS XMatch em lote): descarta o que já é catalogado. O SIMBAD usa posições em J2000 e o CatWISE mede em ~2015, então a posição é recuada pelo movimento próprio antes do match. Sem isso, fontes com PM acima de ~0,3"/ano escapam como "novas" | ✅ |
+| 4 | **Cross-match contra SIMBAD** (via CDS XMatch em lote): descarta o que já é catalogado. O SIMBAD usa posições em J2000 e o CatWISE mede em ~2015, então a posição é recuada pelo movimento próprio antes do match. Sem isso, fontes com PM acima de ~0,3"/ano escapam como "novas". Depois, os que sobram são cruzados com 11 listas de anãs frias do VizieR (`CATALOGOS_ANAS` em `config.py`, como Karpov+2025, Kirkpatrick+2021/2024 e Best+2018), nas duas épocas, porque o SIMBAD demora a absorver catálogos novos | ✅ |
 | 5 | **Triagem assistida por LLM**: prioriza os candidatos por consistência com uma anã L, T ou Y. A LLM ordena esforço humano, **nunca dá o veredito final**. O score varia entre rodadas (cerca de 1/3 dos candidatos mudam), então vale só como prioridade | ✅ |
 | 6 | **Inspeção visual humana** (app Streamlit): recortes unWISE e óptico com mira na posição, números, links pro WiseView, teste de movimento contra o AllWISE, busca por código e filtro por situação, decisão confirmar/dúvida/descartar gravada em `revisao_humana`. O notebook `inspecao_visual.ipynb` é a versão antiga, só com links | ✅ |
 | 7 | **Relatório** dos confirmados (HTML com imagens embutidas), gerado por botão no app ou por `python src/relatorio.py` (que também grava um CSV), pra enviar a um astrônomo e pedir uma segunda opinião. Manual, como a Fase 6 | ✅ |
@@ -250,7 +250,7 @@ Tudo em `data/rastro.db` (SQLite). Tabelas, em ordem de fase:
 
 - `campo_bruto`: resultado da query TAP (Fase 2)
 - `candidatos_fase3`: após filtro de qualidade
-- `candidatos_fase4`: após cross-match SIMBAD (com `status` e `simbad_match_id`)
+- `candidatos_fase4`: após cross-match SIMBAD e listas de anãs (com `status`, `simbad_match_id` e `catalogo_match`)
 - `candidatos_fase5`: após triagem LLM (com `llm_triage_score` e `llm_triage_notes`)
 - `revisao_humana`: suas decisões da Fase 6 (`confirmado`, `duvida` ou `descartado`, com nota). Tabela própria, que o pipeline não recria
 
