@@ -15,8 +15,7 @@ Rodar a partir da raiz do repositório (o `sys.path` e os caminhos em `config.py
 ```bash
 python3 -m venv venv && source venv/bin/activate   # se ainda não existir
 pip install -r requirements.txt
-export PYTHONUNBUFFERED=1
-python pipeline.py                  # roda as 5 fases em sequência
+python -u pipeline.py               # -u: print sai na hora mesmo com saída redirecionada
 ```
 
 Rodar uma fase isolada (cada módulo expõe `run()`):

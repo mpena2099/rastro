@@ -175,9 +175,10 @@ A partir da raiz do repositório:
 ```bash
 python3 -m venv venv && source venv/bin/activate   # se ainda nao existir
 pip install -r requirements.txt
-export PYTHONUNBUFFERED=1
-python pipeline.py          # roda as fases 1 a 5 em sequencia
+python -u pipeline.py       # roda as fases 1 a 5 em sequencia
 ```
+
+`-u` faz o Python escrever cada `print` na hora. No terminal isso já acontece, mas com a saída redirecionada (`> log.txt`, `| tee log.txt`, `nohup`) o Python junta tudo em blocos e o log fica parado por minutos, parecendo travado, nas fases longas.
 
 As fases 1 a 4 não precisam de chave. A Fase 5 precisa de uma chave grátis de LLM (veja [Triagem por LLM](#triagem-por-llm-fase-5)). Sem chave, ela falha e as tabelas das fases anteriores continuam no banco.
 
