@@ -58,6 +58,21 @@ def apagar_revisao(conn: sqlite3.Connection, source_id: str) -> None:
     conn.commit()
 
 
+def ler_cruzamentos(conn: sqlite3.Connection) -> pd.DataFrame:
+    """Gaia/Pan-STARRS/AllWISE ja cruzados (tabela cruzamentos_app), ou vazio."""
+    try:
+        return pd.read_sql("SELECT * FROM cruzamentos_app", conn)
+    except Exception:
+        return pd.DataFrame(columns=["source_id"])
+
+
+def salvar_cruzamentos(conn: sqlite3.Connection, novos: pd.DataFrame) -> None:
+    """Acrescenta os cruzamentos novos; o app so cruza quem ainda nao esta na tabela."""
+    tabela = pd.concat([ler_cruzamentos(conn), novos], ignore_index=True)
+    tabela.drop_duplicates("source_id", keep="last").to_sql(
+        "cruzamentos_app", conn, if_exists="replace", index=False)
+
+
 def url_recorte(ra: float, dec: float, camada: str, tamanho_arcsec: float = 60.0) -> str:
     """Recorte do visualizador do Legacy Surveys (unWISE e DR10 no mesmo servico)."""
     pixscale = 1.375 if camada.startswith("unwise") else 0.262

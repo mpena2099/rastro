@@ -32,15 +32,35 @@ def vizier(ra: float, dec: float, pm_total: float) -> pd.DataFrame:
     return dados.buscar_vizier(ra, dec, pm_total)
 
 
-@st.cache_data(show_spinner="Cruzando com Gaia, Pan-STARRS e AllWISE (uma vez)...")
-def cruzamentos(df: pd.DataFrame):
-    out, erros = df[["source_id"]].copy(), []
-    for nome, fn in (("Gaia/Pan-STARRS", dados.cruzar_gaia_ps1), ("AllWISE", dados.cruzar_allwise)):
-        try:
-            out = out.merge(fn(df), on="source_id", how="left")
-        except Exception as e:
-            erros.append(f"{nome}: {e}")
-    return out, erros
+def cruzamentos(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+    """Cruzamentos guardados no banco; so os candidatos novos vao ao Gaia/PS1/AllWISE.
+
+    Leva ~1 min por centena. Cruzamento que falha nao e gravado e volta na proxima abertura.
+    """
+    with conectar() as conn:
+        salvos = dados.ler_cruzamentos(conn)
+    faltam = df[~df["source_id"].isin(salvos["source_id"])]
+    if faltam.empty:
+        return salvos, []
+    novos, erros = faltam[["source_id"]].copy(), []
+    with st.status(f"Preparando a fila: cruzando {len(faltam)} candidato(s) novo(s), só desta vez",
+                   expanded=True) as status:
+        for nome, fn, tempo in (("Gaia DR3 e Pan-STARRS", dados.cruzar_gaia_ps1, "~10 s"),
+                                ("AllWISE (teste de movimento)", dados.cruzar_allwise, "~1 min")):
+            st.write(f"{nome} ({tempo})")
+            try:
+                novos = novos.merge(fn(faltam), on="source_id", how="left")
+            except Exception as e:
+                erros.append(f"{nome}: {e}")
+        if erros:
+            status.update(label="Cruzamento incompleto: tento de novo na próxima abertura",
+                          state="error", expanded=False)
+            return pd.concat([salvos, novos], ignore_index=True), erros
+        with conectar() as conn:
+            dados.salvar_cruzamentos(conn, novos)
+        status.update(label=f"Fila pronta: {len(faltam)} candidato(s) cruzado(s) e guardado(s)",
+                      state="complete", expanded=False)
+    return pd.concat([salvos, novos], ignore_index=True), []
 
 
 def conectar() -> sqlite3.Connection:
@@ -79,6 +99,8 @@ if todos.empty:
     st.warning("A tabela candidatos_fase4 não tem candidatos.")
     st.stop()
 
+todos["decisao"] = todos["decisao"].fillna("pendente")
+estilo.cabecalho("Revisão visual", (int((todos["decisao"] != "pendente").sum()), len(todos)))
 cruz, erros_cruz = cruzamentos(
     todos[["source_id", "ra", "dec", "pmra", "pmdec", "meanobsmjd"]])
 todos = todos.merge(cruz, on="source_id", how="left")
@@ -160,10 +182,7 @@ if _linhas and _linhas != st.session_state.get("sel_aplicada") and _linhas[0] < 
     st.session_state.pos = _linhas[0]
     st.session_state.sel_aplicada = _linhas
 
-revisados = int((todos["decisao"] != "pendente").sum())
-
 # ---------------------------------------------------------------- tela
-estilo.cabecalho("Revisão visual", (revisados, len(todos)))
 for e in erros_cruz:
     st.warning(f"Sem cruzamento, {e}")
 if total == 0:
