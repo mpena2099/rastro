@@ -157,9 +157,13 @@ def test_checklist_e_sugestao():
     assert all(set(i) == {"estado", "titulo", "explicacao"} for i in itens)
     assert dados.sugestao(itens) == "confirmado"
     assert dados.sugestao(dados.checklist({**ok, "allwise_status": "parado"})) == "descartado"
-    g15 = dados.checklist({**ok, "gaia_detectada": True, "gaia_g": 15.0})
+    # G-W2 < 5: estrela comum; G-W2 >= 5: pode ser ana M tardia ou L (mesmo com G < 19)
+    g15 = dados.checklist({**ok, "gaia_detectada": True, "gaia_g": 15.0, "w2mpro": 12.0})
     assert any(i["estado"] == "problema" for i in g15)
-    assert dados.sugestao(dados.checklist({**ok, "gaia_g": 20.0, "gaia_detectada": True})) == "duvida"
+    l_proxima = dados.checklist({**ok, "gaia_detectada": True, "gaia_g": 18.0, "w2mpro": 10.5})
+    assert not any(i["estado"] == "problema" for i in l_proxima)
+    assert dados.sugestao(dados.checklist({**ok, "gaia_g": 20.0, "gaia_detectada": True,
+                                           "w2mpro": 13.0})) == "duvida"
     assert dados.sugestao(dados.checklist({**ok, "cor_w1w2": 0.2})) == "duvida"
     # chave ausente nao pode quebrar (casos do treino nao tem Gaia/PS1/AllWISE)
     faltando = dados.checklist({})
@@ -261,13 +265,18 @@ def test_guia_pista_e_exemplos():
     from app.guia import exemplos, pista
     assert "nada no óptico" in pista({"explicacao": "Anã T5.5 conhecida: X", "pm_total": 1.0})
     assert "vermelho fraco" in pista({"explicacao": "Anã L2 conhecida: X", "pm_total": 0.5})
-    assert "óptico" in pista({"explicacao": "Estrela comum de alto movimento já catalogada (LP 1)"})
+    assert "SIMBAD" in pista({"explicacao": "Estrela já catalogada no SIMBAD (LP 1, PM*)"})
+    assert "difusa" in pista({"explicacao": "Galáxia catalogada no SIMBAD (SDSS J1)"})
+    from app.dados import explicar_catalogado
+    assert explicar_catalogado("X", "G", None).startswith("Galáxia")
+    assert "não é descoberta" in explicar_catalogado("X", "", None)
+    assert "M6V" in explicar_catalogado("X", "PM*", "M6V")
     assert "significância" in pista({"explicacao": "O filtro de qualidade da Fase 3 rejeitou", "pm_signif": 6.0})
     casos = pd.DataFrame({
         "ra": [1.0, 2.0, 3.0, 4.0], "dec": [0.0] * 4, "pm_total": [2.0, 1.0, 0.4, 0.5],
         "pm_signif": [30, 20, 5, 9], "w2mpro": [15, 15, 9, 16],
         "explicacao": ["Anã T8 conhecida: A", "Anã T5 conhecida: B",
-                       "Estrela comum de alto movimento já catalogada (C)",
+                       "Estrela já catalogada no SIMBAD (C, PM*)",
                        "O filtro de qualidade da Fase 3 rejeitou: x"]})
     ex = exemplos(casos)
     assert ex["movimento"][0]["ra"] == 1.0 and ex["ls-dr10"][1]["ra"] == 3.0

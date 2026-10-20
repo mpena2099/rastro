@@ -37,6 +37,19 @@ CONTRASTE = {
 }
 
 
+def _tipos_simbad(nomes: list[str]) -> pd.DataFrame:
+    """otype e sp_type de cada nome; vazio se o SIMBAD falhar (o treino usa texto generico)."""
+    try:
+        from astroquery.simbad import Simbad
+        s = Simbad()
+        s.add_votable_fields("otype", "sp_type")
+        t = s.query_objects(nomes).to_pandas()
+        return (t.rename(columns={"user_specified_id": "simbad_match_id"})
+                [["simbad_match_id", "otype", "sp_type"]].drop_duplicates("simbad_match_id"))
+    except Exception:
+        return pd.DataFrame(columns=["simbad_match_id", "otype", "sp_type"])
+
+
 @st.cache_data(show_spinner=False)
 def casos_de_treino() -> pd.DataFrame:
     """Anãs conhecidas, estrelas comuns do SIMBAD e rejeitados da Fase 3, com resposta."""
@@ -48,6 +61,8 @@ def casos_de_treino() -> pd.DataFrame:
         bruto = pd.read_sql("SELECT * FROM campo_bruto", conn)
         fase3 = pd.read_sql("SELECT source_id FROM candidatos_fase3", conn)
     rejeitados = bruto[~bruto["source_id"].isin(fase3["source_id"])]
+    estrelas = estrelas.merge(_tipos_simbad(estrelas["simbad_match_id"].tolist()),
+                              on="simbad_match_id", how="left")
     return dados.casos_treino(pd.read_pickle(ROOT / "data" / "recall_conhecidas.pkl"),
                               estrelas, rejeitados)
 
@@ -59,7 +74,7 @@ def exemplos(casos: pd.DataFrame, excluir: tuple[float, float] | None = None) ->
         casos = casos[~mesmo]
     anas_t = casos[casos["explicacao"].str.contains("Anã T", na=False)]
     anas = anas_t if not anas_t.empty else casos[casos["resposta"] == "confirmado"]
-    estrelas = casos[casos["explicacao"].str.contains("Estrela comum", na=False)]
+    estrelas = casos[casos["explicacao"].str.contains("Estrela já catalogada", na=False)]
     rejeitados = casos[casos["explicacao"].str.contains("filtro de qualidade", na=False)]
 
     def um(df, coluna, maior):
@@ -83,9 +98,12 @@ def pista(c: dict) -> str:
         anda = "" if pm is None else (f" Em 14 anos ela anda {pm * 14:.0f}\" "
                                       f"(~{pm * 14 / 2.75:.0f} pixels do unWISE).")
         return f"Ponto compacto no infravermelho e {otico}.{anda}"
-    if "Estrela comum" in explicacao:
-        return ("Olhe o óptico: uma estrela clara e brilhante na mira. O movimento é real, "
-                "mas é uma estrela comum próxima, não uma anã fria.")
+    if "Galáxia" in explicacao:
+        return ("Olhe o óptico: mancha difusa com estrutura, não um ponto. Galáxia não se move; "
+                "no blink nada anda de forma contínua.")
+    if "Estrela já catalogada" in explicacao:
+        return ("O SIMBAD já tem este objeto como estrela. Nas imagens, compare o óptico: estrela "
+                "comum costuma aparecer no visível, e a cor W1-W2 fica abaixo da de uma anã fria.")
     if "filtro de qualidade" in explicacao:
         sig = c.get("pm_signif")
         extra = "" if sig is None else f" A significância do movimento é só {sig:.1f}."

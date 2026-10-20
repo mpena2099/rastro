@@ -296,13 +296,19 @@ def checklist(r: dict) -> list[dict]:
     detectada, g = valor("gaia_detectada"), valor("gaia_g")
     if detectada is not None and not bool(detectada):
         itens.append(item("ok", "Gaia", "Sem contraparte no Gaia: não é uma estrela comum brilhante."))
-    elif detectada is not None and g is not None and g < 19:
-        itens.append(item("problema", "Gaia",
-                          f"Contraparte no Gaia com G = {g:.1f}: estrela comum."))
     elif detectada is not None and g is not None:
-        itens.append(item("atencao", "Gaia",
-                          f"Contraparte no Gaia com G = {g:.1f}, bem fraca: anãs L também podem "
-                          "aparecer. Confira a imagem."))
+        # G - W2 separa estrela de ana pela cor, independente da distancia: ~5 numa M5,
+        # acima de ~6,5 nas anas L. So G < 19 descartava uma ana L muito proxima.
+        w2 = valor("w2mpro")
+        if w2 is not None and g - w2 < 5:
+            itens.append(item("problema", "Gaia",
+                              f"Contraparte no Gaia com G = {g:.1f} e G-W2 = {g - w2:.1f}: azul "
+                              "demais para uma anã fria, é estrela comum."))
+        else:
+            cor_gw = "" if w2 is None else f" e G-W2 = {g - w2:.1f}"
+            itens.append(item("atencao", "Gaia",
+                              f"Contraparte no Gaia com G = {g:.1f}{cor_gw}: vermelha o bastante "
+                              "para ser anã M tardia ou L. Confira a imagem."))
     else:
         itens.append(item("atencao", "Gaia",
                           "Sem cruzamento com o Gaia: não dá para descartar estrela comum."))
@@ -382,6 +388,23 @@ def epocas_blink(ra: float, dec: float, tamanho_px: int = 24) -> list[tuple[floa
 
 
 # ---------------------------------------------------------------- modo treino
+OTIPOS_ULTRAFRIAS = {"BD*", "BD?", "LM*", "LM?"}
+OTIPOS_GALAXIA = {"G", "GiG", "GiC", "GiP", "AGN", "QSO", "Sy1", "Sy2", "SyG", "BLL", "LIN",
+                  "EmG", "SBG", "rG", "H2G", "bCG", "LSB", "PaG", "IG", "GrG", "ClG", "Q?", "G?"}
+
+
+def explicar_catalogado(nome, otype, sp_type) -> str:
+    """Explicacao do treino para objeto ja no SIMBAD, pelo tipo que o SIMBAD da a ele."""
+    if otype in OTIPOS_GALAXIA:
+        return (f"Galáxia catalogada no SIMBAD ({nome}): galáxia não se move, o movimento "
+                "medido é erro de ajuste numa fonte estendida.")
+    if not isinstance(otype, str) or not otype.strip():
+        return f"Objeto já catalogado no SIMBAD ({nome}): não é descoberta nova."
+    sp = f", tipo {sp_type}" if isinstance(sp_type, str) and sp_type.strip() else ""
+    return (f"Estrela já catalogada no SIMBAD ({nome}, {otype}{sp}): o movimento é real, mas é "
+            "uma estrela conhecida, mais quente que uma anã marrom.")
+
+
 def casos_treino(conhecidas: pd.DataFrame, estrelas: pd.DataFrame, rejeitados: pd.DataFrame,
                  n_por_classe: int = 10, semente: int = 42) -> pd.DataFrame:
     """Casos rotulados do modo treino, sorteados por classe e misturados.
@@ -410,11 +433,14 @@ def casos_treino(conhecidas: pd.DataFrame, estrelas: pd.DataFrame, rejeitados: p
             linhas.append({**linha(x), "resposta": "confirmado",
                            "explicacao": f"Anã {x.sp_type} conhecida: {x.main_id}"})
     e = preparar(estrelas)
+    if "otype" in e:
+        # ana marrom ou estrela ultrafria no SIMBAD nao e descarte claro neste projeto
+        e = e[~e["otype"].isin(OTIPOS_ULTRAFRIAS)]
     for x in e.sample(min(n_por_classe, len(e)), random_state=semente).itertuples():
-        nome = getattr(x, "simbad_match_id", "sem nome")
         linhas.append({**linha(x), "resposta": "descartado",
-                       "explicacao": f"Estrela comum de alto movimento já catalogada ({nome}): "
-                                     "brilha no óptico."})
+                       "explicacao": explicar_catalogado(getattr(x, "simbad_match_id", "sem nome"),
+                                                         getattr(x, "otype", None),
+                                                         getattr(x, "sp_type", None))})
     rej = preparar(rejeitados)
     rej = rej[rej["pm_total"] >= 0.3]
     for x in rej.sample(min(n_por_classe, len(rej)), random_state=semente).itertuples():
