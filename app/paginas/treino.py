@@ -75,7 +75,7 @@ if pos >= len(st.session_state.casos) - 1:
     nav[1].button("Recomeçar", on_click=recomecar)
 nav[2].markdown(f"**Caso {pos + 1} de {len(st.session_state.casos)}**")
 
-imagens.mostrar(float(c["ra"]), float(c["dec"]))
+completar_animacao = imagens.mostrar(float(c["ra"]), float(c["dec"]))
 
 esquerda, direita = st.columns([3, 2])
 with esquerda:
@@ -106,3 +106,6 @@ with direita:
                 st.warning("Meio ponto: a dúvida vale metade.")
             else:
                 st.error(f"Errou: você marcou {ROTULOS[escolha]}.")
+
+# a animacao do WiseView e a parte lenta: carrega por ultimo
+completar_animacao()

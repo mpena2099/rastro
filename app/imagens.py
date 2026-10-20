@@ -63,7 +63,7 @@ def animacao(ra: float, dec: float, tamanho_px: int = 24):
         return None
 
 
-@st.cache_data(show_spinner="Buscando as épocas no WiseView (até 1 min)...")
+@st.cache_data(show_spinner=False)
 def _animacao(ra: float, dec: float, tamanho_px: int = 24) -> bytes:
     """Quadros do W2 por época em 330 px, com a mira e o ano escrito (500 ms cada, em loop)."""
     fonte = ImageFont.load_default(size=26)
@@ -82,24 +82,50 @@ def _animacao(ra: float, dec: float, tamanho_px: int = 24) -> bytes:
     if not quadros:
         raise ValueError("sem épocas para animar")
     saida = io.BytesIO()
+    # 900 ms por epoca e pausa no ultimo quadro, pra dar tempo de seguir o ponto
+    duracoes = [900] * (len(quadros) - 1) + [1800]
     quadros[0].save(saida, format="GIF", save_all=True, append_images=quadros[1:],
-                    duration=500, loop=0, disposal=2)
+                    duration=duracoes, loop=0, disposal=2)
     return saida.getvalue()
 
 
-def mostrar(ra: float, dec: float) -> None:
-    """Os dois recortes e a animacao lado a lado, com legenda e aviso de falha."""
+def carregando(texto: str, quadrado: bool = True) -> str:
+    """HTML de "carregando" (circulo girando e texto), no lugar de conteudo que vem da rede."""
+    forma = "aspect-ratio:1;" if quadrado else "min-height:120px;"
+    return (f'<div style="{forma}display:flex;flex-direction:column;align-items:center;'
+            'justify-content:center;gap:12px;border:1px solid #232C3B;border-radius:6px;'
+            'background:#151B26;color:#9AA4B5;font-size:0.9rem;text-align:center;padding:12px">'
+            '<div style="width:36px;height:36px;border:3px solid #232C3B;border-top-color:#FF8A3D;'
+            'border-radius:50%;animation:giro 0.9s linear infinite"></div>'
+            f'{texto}</div><style>@keyframes giro{{to{{transform:rotate(360deg)}}}}</style>')
+
+
+def mostrar(ra: float, dec: float):
+    """Os tres quadros com "carregando" na hora; devolve a funcao que baixa e preenche.
+
+    A pagina chama a funcao no fim, pra numeros, checklist e botoes aparecerem antes:
+    recortes levam alguns segundos e o WiseView ate 1 min na primeira vez.
+    """
     colunas = st.columns(len(CAMADAS) + 1)
-    for coluna, (camada, titulo) in zip(colunas, CAMADAS):
+    lugares = []
+    for coluna, titulo, texto in zip(
+            colunas, [t for _, t in CAMADAS] + ["Movimento (unWISE W2 por época, WiseView)"],
+            ["Carregando o recorte"] * len(CAMADAS) + ["Carregando o movimento<br>(WiseView, até 1 min)"]):
         coluna.caption(titulo)
-        img = recorte(ra, dec, camada)
-        if img is None:
-            coluna.warning("Recorte indisponível (servidor fora do ar ou sem cobertura).")
+        lugar = coluna.empty()
+        lugar.markdown(carregando(texto), unsafe_allow_html=True)
+        lugares.append(lugar)
+
+    def completar():
+        for lugar, (camada, _) in zip(lugares, CAMADAS):
+            img = recorte(ra, dec, camada)
+            if img is None:
+                lugar.warning("Recorte indisponível (servidor fora do ar ou sem cobertura).")
+            else:
+                lugar.image(img, width="stretch")
+        gif = animacao(ra, dec)
+        if gif is None:
+            lugares[-1].warning("Animação indisponível (servidor do WiseView fora do ar).")
         else:
-            coluna.image(img, width="stretch")
-    colunas[-1].caption("Movimento (unWISE W2 por época, WiseView)")
-    gif = animacao(ra, dec)
-    if gif is None:
-        colunas[-1].warning("Animação indisponível (servidor do WiseView fora do ar).")
-    else:
-        colunas[-1].image(gif, width="stretch")
+            lugares[-1].image(gif, width="stretch")
+    return completar

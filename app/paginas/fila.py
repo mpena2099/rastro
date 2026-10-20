@@ -27,7 +27,7 @@ ALLWISE_ROTULO = {
 ROTULOS = {"confirmado": "Confirmado", "duvida": "Dúvida", "descartado": "Descartado"}
 
 
-@st.cache_data(show_spinner="Consultando o VizieR inteiro (20 s a 1 min)...")
+@st.cache_data(show_spinner=False)
 def vizier(ra: float, dec: float, pm_total: float) -> pd.DataFrame:
     return dados.buscar_vizier(ra, dec, pm_total)
 
@@ -201,7 +201,7 @@ nav[1].button("Próximo ▶", on_click=mover, args=(+1, total),
 nav[2].markdown(f"**{st.session_state.pos + 1} de {total}** na fila  |  `{sid}`  |  "
                 f"RA {r['ra']:.5f}, Dec {r['dec']:+.5f}")
 
-imagens.mostrar(float(r["ra"]), float(r["dec"]))
+completar_animacao = imagens.mostrar(float(r["ra"]), float(r["dec"]))
 st.caption("Recortes de 60\" x 60\", norte pra cima e leste à esquerda. A mira verde marca a "
            "posição do CatWISE (~2015). Um objeto real e próximo aparece no infravermelho; "
            "um ponto só no óptico é fonte comum. Na animação, as fontes aparecem escuras e cada quadro é uma época do W2 "
@@ -280,8 +280,12 @@ with st.expander("Já foi publicado? (busca no VizieR inteiro)"):
                "olha todos os catálogos do VizieR, e é como se acha um catálogo novo que ainda não "
                "entrou na lista. Faça antes de confirmar um candidato.")
     if st.button("Buscar no VizieR", key=f"vizier_{sid}"):
+        aguarde = st.empty()
+        aguarde.markdown(imagens.carregando("Consultando o VizieR inteiro (20 s a 1 min)", False),
+                         unsafe_allow_html=True)
         try:
             achados = vizier(float(r["ra"]), float(r["dec"]), float(r["pm_total"]))
+            aguarde.empty()
             anas = achados[achados["lista_anas"]]
             if anas.empty:
                 st.success(dados.resumo_vizier(achados))
@@ -290,6 +294,7 @@ with st.expander("Já foi publicado? (busca no VizieR inteiro)"):
                            "Confira se é o mesmo objeto (distância pequena) antes de confirmar.")
             st.dataframe(achados, hide_index=True, width="stretch")
         except Exception as e:
+            aguarde.empty()
             st.error(f"VizieR falhou: {e}")
 
 with st.expander(f"Nota da LLM: {r['llm_triage_score']}"):
@@ -332,3 +337,6 @@ with st.expander("Casos de referência (como são os confirmar, dúvida e descar
         with aba:
             st.image(str(ROOT / "docs" / "img" / f"ref_{chave}.jpg"))
             st.markdown(textos[chave])
+
+# a animacao do WiseView e a parte lenta: carrega por ultimo
+completar_animacao()
