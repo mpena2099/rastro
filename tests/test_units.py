@@ -257,5 +257,22 @@ def _main():
     sys.exit(1 if falhas else 0)
 
 
+def test_guia_pista_e_exemplos():
+    from app.guia import exemplos, pista
+    assert "nada no óptico" in pista({"explicacao": "Anã T5.5 conhecida: X", "pm_total": 1.0})
+    assert "vermelho fraco" in pista({"explicacao": "Anã L2 conhecida: X", "pm_total": 0.5})
+    assert "óptico" in pista({"explicacao": "Estrela comum de alto movimento já catalogada (LP 1)"})
+    assert "significância" in pista({"explicacao": "O filtro de qualidade da Fase 3 rejeitou", "pm_signif": 6.0})
+    casos = pd.DataFrame({
+        "ra": [1.0, 2.0, 3.0, 4.0], "dec": [0.0] * 4, "pm_total": [2.0, 1.0, 0.4, 0.5],
+        "pm_signif": [30, 20, 5, 9], "w2mpro": [15, 15, 9, 16],
+        "explicacao": ["Anã T8 conhecida: A", "Anã T5 conhecida: B",
+                       "Estrela comum de alto movimento já catalogada (C)",
+                       "O filtro de qualidade da Fase 3 rejeitou: x"]})
+    ex = exemplos(casos)
+    assert ex["movimento"][0]["ra"] == 1.0 and ex["ls-dr10"][1]["ra"] == 3.0
+    assert exemplos(casos, excluir=(1.0, 0.0))["movimento"][0]["ra"] == 2.0
+
+
 if __name__ == "__main__":
     _main()

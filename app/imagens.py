@@ -168,7 +168,7 @@ def carregando(texto: str, quadrado: bool = True) -> str:
             f'{texto}</div><style>@keyframes giro{{to{{transform:rotate(360deg)}}}}</style>')
 
 
-def mostrar(ra: float, dec: float):
+def mostrar(ra: float, dec: float, legendas: list[str] | None = None):
     """Os tres quadros com "carregando" na hora; devolve a funcao que baixa e preenche.
 
     A pagina chama a funcao no fim, pra numeros, checklist e botoes aparecerem antes:
@@ -183,6 +183,8 @@ def mostrar(ra: float, dec: float):
         lugar = coluna.empty()
         lugar.markdown(carregando(texto), unsafe_allow_html=True)
         lugares.append(lugar)
+    for coluna, legenda in zip(colunas, legendas or []):
+        coluna.caption(legenda)
 
     def completar():
         for lugar, (camada, _) in zip(lugares, CAMADAS):

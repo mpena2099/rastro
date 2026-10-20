@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import pandas as pd
 import streamlit as st
 
-from app import dados, estilo, imagens
+from app import dados, estilo, imagens, guia
 from config import ROOT, SQLITE_PATH
 from src import relatorio
 
@@ -201,7 +201,13 @@ nav[1].button("Próximo ▶", on_click=mover, args=(+1, total),
 nav[2].markdown(f"**{st.session_state.pos + 1} de {total}** na fila  |  `{sid}`  |  "
                 f"RA {r['ra']:.5f}, Dec {r['dec']:+.5f}")
 
-completar_animacao = imagens.mostrar(float(r["ra"]), float(r["dec"]))
+try:
+    _casos = guia.casos_de_treino()
+except Exception:  # sem data/recall_conhecidas.pkl o guia fica so com o roteiro
+    _casos = None
+completar_guia = guia.mostrar_guia(_casos, aberto=False)
+completar_animacao = imagens.mostrar(float(r["ra"]), float(r["dec"]),
+                                     [f"**{t}.** {q}" for t, q in guia.ROTEIRO.values()])
 _pos = st.session_state.pos
 imagens.pre_carregar([(float(x.ra), float(x.dec)) for x in fila.iloc[_pos + 1:_pos + 4].itertuples()])
 st.caption("Recortes de 60\" x 60\", norte pra cima e leste à esquerda. A mira verde marca a "
@@ -342,3 +348,4 @@ with st.expander("Casos de referência (como são os confirmar, dúvida e descar
 
 # a animacao do WiseView e a parte lenta: carrega por ultimo
 completar_animacao()
+completar_guia()

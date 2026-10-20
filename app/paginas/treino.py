@@ -9,25 +9,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import pandas as pd
 import streamlit as st
 
-from app import dados, estilo, imagens
+from app import dados, estilo, imagens, guia
 from config import ROOT, SQLITE_PATH
 
 ROTULOS = {"confirmado": "Confirmado", "duvida": "Dúvida", "descartado": "Descartado"}
-
-
-@st.cache_data(show_spinner="Montando os casos de treino...")
-def montar_casos() -> pd.DataFrame:
-    """Anãs conhecidas, estrelas comuns do SIMBAD e rejeitados da Fase 3, com resposta."""
-    with sqlite3.connect(str(SQLITE_PATH)) as conn:
-        # so quem tem nome no SIMBAD: catalogo_match sem SIMBAD pode ser ana ja publicada
-        estrelas = pd.read_sql(
-            "SELECT * FROM candidatos_fase4 WHERE status = 'conhecido' "
-            "AND simbad_match_id IS NOT NULL", conn)
-        bruto = pd.read_sql("SELECT * FROM campo_bruto", conn)
-        fase3 = pd.read_sql("SELECT source_id FROM candidatos_fase3", conn)
-    rejeitados = bruto[~bruto["source_id"].isin(fase3["source_id"])]
-    return dados.casos_treino(pd.read_pickle(ROOT / "data" / "recall_conhecidas.pkl"),
-                              estrelas, rejeitados)
 
 
 def responder(i: int, decisao: str):
@@ -49,7 +34,7 @@ def recomecar():
 
 if "casos" not in st.session_state:
     try:
-        st.session_state.casos = montar_casos()
+        st.session_state.casos = guia.casos_de_treino()
     except Exception as e:
         st.error(f"Não consegui montar os casos (o banco precisa das fases 2 a 4): {e}")
         st.stop()
@@ -75,7 +60,10 @@ if pos >= len(st.session_state.casos) - 1:
     nav[1].button("Recomeçar", on_click=recomecar)
 nav[2].markdown(f"**Caso {pos + 1} de {len(st.session_state.casos)}**")
 
-completar_animacao = imagens.mostrar(float(c["ra"]), float(c["dec"]))
+completar_guia = guia.mostrar_guia(st.session_state.casos, aberto=pos == 0,
+                                   excluir=(float(c["ra"]), float(c["dec"])))
+completar_animacao = imagens.mostrar(float(c["ra"]), float(c["dec"]),
+                                     [f"**{t}.** {q}" for t, q in guia.ROTEIRO.values()])
 imagens.pre_carregar([(float(x.ra), float(x.dec))
                       for x in st.session_state.casos.iloc[pos + 1:pos + 4].itertuples()])
 
@@ -102,6 +90,7 @@ with direita:
             escolha = st.session_state.respostas[pos]
             certa = c["resposta"]
             st.markdown(f"**Resposta: {ROTULOS[certa]}.** {c['explicacao']}")
+            st.info(f"**Onde estava a pista.** {guia.pista(c.to_dict())}")
             if escolha == certa:
                 st.success("Você acertou.")
             elif escolha == "duvida":
@@ -111,3 +100,4 @@ with direita:
 
 # a animacao do WiseView e a parte lenta: carrega por ultimo
 completar_animacao()
+completar_guia()
