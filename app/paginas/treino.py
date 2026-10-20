@@ -58,12 +58,13 @@ st.caption("O caso vem sem a resposta. Decida olhando as imagens e os números, 
            "Gaia, Pan-STARRS e AllWISE não entram aqui: o checklist marca como atenção o que falta. "
            "Nada é gravado, é só treino.")
 
-nav = st.columns([1, 1, 6])
-nav[0].button("Próximo ▶", on_click=mover, args=(+1,),
-              disabled=pos >= len(st.session_state.casos) - 1)
+nav = st.columns([1, 1, 1, 5])
+nav[0].button("◀ Anterior", on_click=mover, args=(-1,), disabled=pos == 0, width="stretch")
+nav[1].button("Próximo ▶", on_click=mover, args=(+1,),
+              disabled=pos >= len(st.session_state.casos) - 1, width="stretch")
 if pos >= len(st.session_state.casos) - 1:
-    nav[1].button("Recomeçar", on_click=recomecar)
-nav[2].markdown(f"**Caso {pos + 1} de {len(st.session_state.casos)}**")
+    nav[2].button("Recomeçar", on_click=recomecar, width="stretch")
+nav[3].markdown(f"**Caso {pos + 1} de {len(st.session_state.casos)}**")
 
 completar_guia = guia.mostrar_guia(st.session_state.casos, aberto=pos == 0,
                                    excluir=(float(c["ra"]), float(c["dec"])))
