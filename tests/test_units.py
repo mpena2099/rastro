@@ -148,6 +148,62 @@ def test_url_recorte():
     assert "pixscale=0.262" in dados.url_recorte(150.0, 20.0, "ls-dr10")
 
 
+def test_checklist_e_sugestao():
+    from app import dados
+    ok = {"pm_signif": 20.0, "allwise_status": "consistente", "gaia_detectada": False,
+          "ps1_detectada": False, "cor_w1w2": 1.2}
+    itens = dados.checklist(ok)
+    assert [i["estado"] for i in itens] == ["ok"] * 5
+    assert all(set(i) == {"estado", "titulo", "explicacao"} for i in itens)
+    assert dados.sugestao(itens) == "confirmado"
+    assert dados.sugestao(dados.checklist({**ok, "allwise_status": "parado"})) == "descartado"
+    g15 = dados.checklist({**ok, "gaia_detectada": True, "gaia_g": 15.0})
+    assert any(i["estado"] == "problema" for i in g15)
+    assert dados.sugestao(dados.checklist({**ok, "gaia_g": 20.0, "gaia_detectada": True})) == "duvida"
+    assert dados.sugestao(dados.checklist({**ok, "cor_w1w2": 0.2})) == "duvida"
+    # chave ausente nao pode quebrar (casos do treino nao tem Gaia/PS1/AllWISE)
+    faltando = dados.checklist({})
+    assert len(faltando) == 5 and all(i["estado"] == "atencao" for i in faltando)
+
+
+def test_url_blink():
+    from app import dados
+    u = dados.url_blink(150.0, 20.0)
+    assert "ra=150.0" in u and "dec=20.0" in u and "band=2" in u and "size=24" in u
+
+
+def test_casos_treino():
+    from app import dados
+    conhecidas = pd.DataFrame({
+        "main_id": ["Ana 1", "Ana 2", "Ana 3", "Ana 4", "Ana 5", "Ana 6"],
+        "sp_type": ["L5", "T2", "Y0", "L8", "T7", "Y1"],
+        "tipo": ["L", "T", "Y", "L", "T", "Y"],
+        "ra": [10.0, 11.0, 12.0, 13.0, 14.0, 15.0], "dec": [0.0] * 6,
+        "pmra": [0.5] * 6, "pmdec": [0.1] * 6,
+        "sigpmra": [0.01] * 6, "sigpmdec": [0.01] * 6,
+        "w1mpro": [15.0] * 6, "w2mpro": [13.5] * 6})
+    estrelas = pd.DataFrame({
+        "ra": [20.0, 21.0, 22.0], "dec": [1.0] * 3,
+        "pmra": [0.3] * 3, "pmdec": [0.1] * 3,
+        "sigpmra": [0.01] * 3, "sigpmdec": [0.01] * 3,
+        "w1mpro": [12.0] * 3, "w2mpro": [11.9] * 3,
+        "simbad_match_id": ["LSPM J1", "HD 2", "TYC 3"]})
+    rejeitados = pd.DataFrame({
+        "ra": [30.0, 31.0], "dec": [2.0, 2.0],
+        "pmra": [0.4, 0.05], "pmdec": [0.0, 0.0],
+        "sigpmra": [0.01] * 2, "sigpmdec": [0.01] * 2,
+        "w1mpro": [16.0] * 2, "w2mpro": [15.0] * 2})
+    casos = dados.casos_treino(conhecidas, estrelas, rejeitados, n_por_classe=2)
+    assert list(casos.columns) == ["ra", "dec", "pm_total", "pm_signif", "cor_w1w2", "w2mpro",
+                                   "resposta", "explicacao"]
+    # 2 por tipo conhecido + 2 estrelas + 1 rejeitado (o de PM 0.05 e cortado)
+    assert len(casos) == 9
+    assert casos["resposta"].value_counts().to_dict() == {"confirmado": 6, "descartado": 3}
+    assert "Anã L5 conhecida: Ana 1" in casos["explicacao"].tolist()
+    assert casos.equals(dados.casos_treino(conhecidas, estrelas, rejeitados, n_por_classe=2))
+    assert not casos.equals(dados.casos_treino(conhecidas, estrelas, rejeitados, n_por_classe=3))
+
+
 def test_relatorio():
     from src.relatorio import nome_iau, montar_html
     assert nome_iau(150.0, 20.0) == "J100000.00+200000.0"

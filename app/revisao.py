@@ -7,29 +7,19 @@ recortes de imagem e os numeros de cada um, e grava a decisao humana na tabela
 revisao_humana do mesmo banco. Rodar a partir da raiz do repositorio.
 """
 
-import io
 import sqlite3
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import httpx
 import pandas as pd
 import streamlit as st
-from PIL import Image, ImageDraw
 
-from app import dados
+from app import dados, imagens
 from config import ROOT, SQLITE_PATH
 from src import relatorio
 
-# NEO7 empilha todas as epocas do WISE (2010 a 2020), entao nao mostra movimento:
-# camadas mais antigas (NEO2, NEO4) sao quase identicas a ela. Movimento se ve no
-# WiseView e no teste do AllWISE.
-CAMADAS = [
-    ("unwise-neo7", "Infravermelho (unWISE NEO7, W1+W2)"),
-    ("ls-dr10", "Óptico (Legacy Surveys DR10, grz)"),
-]
 ORDENACOES = {
     "AllWISE consistente primeiro, depois PM/σ": [("allwise_ordem", True), ("pm_signif", False)],
     "Significância do PM (maior primeiro)": [("pm_signif", False)],
@@ -44,37 +34,6 @@ ALLWISE_ROTULO = {
 ROTULOS = {"confirmado": "Confirmado", "duvida": "Dúvida", "descartado": "Descartado"}
 
 st.set_page_config(page_title="Rastro: revisão visual", layout="wide")
-
-
-def recorte(ra: float, dec: float, camada: str):
-    """Recorte com a mira, ou None se o servidor falhar (a falha nao fica no cache)."""
-    try:
-        return _recorte(ra, dec, camada)
-    except Exception:
-        return None
-
-
-@st.cache_data(show_spinner=False)
-def _recorte(ra: float, dec: float, camada: str):
-    """Baixa o recorte e marca a posicao do candidato (mira com folga no centro)."""
-    url = dados.url_recorte(ra, dec, camada)
-    for tentativa in range(2):
-        try:
-            r = httpx.get(url, timeout=30)
-            r.raise_for_status()
-            img = Image.open(io.BytesIO(r.content)).convert("RGB")
-            break
-        except Exception:
-            if tentativa == 1:
-                raise
-    lado = 330
-    img = img.resize((lado, lado), Image.NEAREST if img.size[0] < 100 else Image.LANCZOS)
-    d = ImageDraw.Draw(img)
-    c, gap, tick = lado // 2, lado // 10, lado // 7
-    for x0, y0, x1, y1 in [(c, c - gap - tick, c, c - gap), (c, c + gap, c, c + gap + tick),
-                           (c - gap - tick, c, c - gap, c), (c + gap, c, c + gap + tick, c)]:
-        d.line((x0, y0, x1, y1), fill=(0, 255, 0), width=2)
-    return img
 
 
 @st.cache_data(show_spinner="Consultando o VizieR inteiro (20 s a 1 min)...")
@@ -261,6 +220,13 @@ m[5].metric("Pan-STARRS", "?" if ps1_flag is None else ("detectada" if ps1_flag 
 m[6].metric("AllWISE (2010)", ALLWISE_ROTULO.get(r["allwise_status"], "sem dados"),
             help="Ver o filtro 'Movimento no AllWISE' na barra lateral.")
 
+itens = dados.checklist(r.to_dict())
+for item in itens:
+    st.markdown(f"{dados.ICONES_CHECKLIST[item['estado']]} **{item['titulo']}.** {item['explicacao']}")
+st.info(f"**Sugestão do pipeline: {ROTULOS[dados.sugestao(itens)]}.** Ela só vale se os dois testes "
+        "humanos passarem: *Tem um ponto nítido no infravermelho, dentro da mira?* e *Na animação, "
+        "o ponto anda sempre na mesma direção?*")
+
 with st.expander(f"Fila completa ({total}): clique numa linha pra abrir o candidato"):
     tabela = fila.assign(
         gaia=fila["gaia_g"].map(lambda v: "sem" if pd.isna(v) else f"G={v:.1f}"),
@@ -270,17 +236,12 @@ with st.expander(f"Fila completa ({total}): clique numa linha pra abrir o candid
     st.dataframe(tabela, hide_index=True, on_select="rerun", selection_mode="single-row",
                  key="tabela_fila", height=260)
 
-imgs = st.columns(len(CAMADAS))
-for coluna, (camada, titulo) in zip(imgs, CAMADAS):
-    img = recorte(float(r["ra"]), float(r["dec"]), camada)
-    coluna.caption(titulo)
-    if img is None:
-        coluna.warning("Recorte indisponível (servidor fora do ar ou sem cobertura).")
-    else:
-        coluna.image(img, width="stretch")
+imagens.mostrar(float(r["ra"]), float(r["dec"]))
 st.caption("Recortes de 60\" x 60\", norte pra cima e leste à esquerda. A mira verde marca a "
            "posição do CatWISE (~2015). Um objeto real e próximo aparece no infravermelho; "
-           "um ponto só no óptico é fonte comum. Imagens: unWISE (NASA/WISE) e Legacy Surveys (DESI).")
+           "um ponto só no óptico é fonte comum. Na animação, cada quadro é uma época do W2 "
+           "(WiseView) e o ano está no canto. Imagens: unWISE (NASA/WISE), Legacy Surveys (DESI) "
+           "e WiseView.")
 
 st.markdown(f"[Abrir no Legacy Surveys]({dados.link_legacy_viewer(r['ra'], r['dec'])})  |  "
             f"[Abrir no WiseView (movimento em épocas)]({dados.link_wiseview(r['ra'], r['dec'])})")
@@ -319,7 +280,7 @@ with st.expander("Como decidir (o que procurar nas imagens)"):
 - O objeto se move. No óptico, ele pode estar um pouco deslocado da mira, na direção do movimento (movimento próprio x anos de diferença entre as imagens). Dentro do espaço vazio da mira (cerca de 6") ainda conta como no lugar.
 - No unWISE, cor avermelhada ou alaranjada é o que se espera de uma anã fria. Azul ou branco é estrela comum.
 - O app compara cada candidato com o AllWISE (~2010): "se moveu (confere)" reforça o caso, "não se moveu" pesa contra, e "sem fonte" não diz nada (o candidato é fraco demais pra aparecer lá).
-- **Confirmar** não é descoberta: quer dizer "passa no olho". O teste decisivo é abrir o link do WiseView e ver o ponto andando sempre na mesma direção ao longo dos anos. Quem não anda é ruído.
+- **Confirmar** não é descoberta: quer dizer "passa no olho". O teste decisivo é a animação "Movimento" ao lado dos recortes: o ponto tem de andar sempre na mesma direção, ano após ano. O link do WiseView abre a mesma animação em tamanho maior.
 - **Descartar** não apaga nada: a decisão fica gravada com a nota e dá pra rever no filtro "Situação".
 """)
 

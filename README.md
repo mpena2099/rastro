@@ -58,7 +58,7 @@ python -c "import sqlite3, pandas as pd; print(pd.read_sql('SELECT source_id, ra
 **O que fazer com o resultado**
 
 A lista é de *suspeitos*, não de descobertas. O caminho depois dela:
-1. **Olhar as imagens** dos suspeitos, começando pelos que o AllWISE mostra se movendo (a nota da IA é só um comentário). O app `app/revisao.py` (veja [Como usar](#como-usar)) mostra os recortes de cada suspeito e grava sua decisão. Os recortes mostram se há um objeto real ali, mas não o movimento: a imagem do infravermelho empilha 10 anos de fotos. O movimento se vê no [WiseView](http://byw.tools/wiseview), que anima as épocas, e no teste do AllWISE.
+1. **Olhar as imagens** dos suspeitos, começando pelos que o AllWISE mostra se movendo (a nota da IA é só um comentário). O app `app/revisao.py` (veja [Como usar](#como-usar)) mostra os recortes de cada suspeito e grava sua decisão. Os recortes mostram se há um objeto real ali; o movimento aparece na animação "Movimento" (quadros do W2 por época, do WiseView) e no teste do AllWISE.
 2. **Descartar os falsos alarmes.** Na prática, quase todos caem aqui: ruído, defeito do instrumento ou ponto mal medido.
 3. **Levar os que sobrarem a um astrônomo**, que pode confirmar com outras observações (um espectro, por exemplo) e, se for novo de verdade, publicar.
 
@@ -77,8 +77,14 @@ A lista é de *suspeitos*, não de descobertas. O caminho depois dela:
 - O objeto se move. No óptico, ele pode estar um pouco deslocado da mira, na direção do movimento (movimento próprio x anos de diferença entre as imagens). Dentro do espaço vazio da mira (cerca de 6") ainda conta como no lugar.
 - No unWISE, cor avermelhada ou alaranjada é o que se espera de uma anã fria. Azul ou branco é estrela comum.
 - O app compara cada candidato com o AllWISE (~2010): "se moveu (confere)" reforça o caso, "não se moveu" pesa contra, e "sem fonte" não diz nada (o candidato é fraco demais pra aparecer lá).
-- **Confirmar** não é descoberta: quer dizer "passa no olho". O teste decisivo é abrir o link do WiseView e ver o ponto andando sempre na mesma direção ao longo dos anos. Quem não anda é ruído.
+- **Confirmar** não é descoberta: quer dizer "passa no olho". O teste decisivo é a animação "Movimento" ao lado dos recortes: o ponto tem de andar sempre na mesma direção, ano após ano. O link do WiseView abre a mesma animação em tamanho maior.
 - **Descartar** não apaga nada: a decisão fica gravada com a nota e dá pra rever no filtro "Situação".
+
+**Checklist, animação e modo treino**
+
+- **Checklist.** Abaixo dos números, o app marca com ✅, ⚠️ ou ❌ cinco testes (movimento, AllWISE, Gaia, cor W1-W2 e óptico) e fecha com "Sugestão do pipeline". A sugestão é só um resumo dos números: ela só vale se os dois testes humanos passarem, um ponto nítido no infravermelho dentro da mira e, na animação, o ponto andando sempre na mesma direção.
+- **Animação.** A terceira imagem mostra o movimento: quadros do W2 do unWISE por época, montados pelo servidor do WiseView, com a mira no lugar e o ano escrito em cada quadro. Se o servidor falhar, a página mostra um aviso e continua funcionando.
+- **Modo treino.** A página `treino`, na barra lateral do app, sorteia 50 casos já resolvidos: anãs L/T/Y conhecidas, estrelas comuns de alto movimento do SIMBAD e candidatos rejeitados pela Fase 3. O caso vem sem a resposta; depois do clique, o app mostra a resposta, a explicação e se você acertou. Dúvida vale meio ponto, e o placar fica na tela. Nada é gravado.
 
 **Casos de referência**
 
@@ -154,7 +160,7 @@ Fases sequenciais. Cada uma lê a tabela produzida pela anterior no SQLite e gra
 | 3 | **Filtragem fina de qualidade**: remove contaminação/artefatos por `cc_flags`/`ab_flags`, troca do componente principal (`pmcode` B=N), confusão de fontes (`n_aw`) e movimento próprio pouco significativo (PM/σ < 8) | ✅ |
 | 4 | **Cross-match contra SIMBAD** (via CDS XMatch em lote): descarta o que já é catalogado. O SIMBAD usa posições em J2000 e o CatWISE mede em ~2015, então a posição é recuada pelo movimento próprio antes do match. Sem isso, fontes com PM acima de ~0,3"/ano escapam como "novas". Depois, os que sobram são cruzados com 11 listas de anãs frias do VizieR (`CATALOGOS_ANAS` em `config.py`, como Karpov+2025, Kirkpatrick+2021/2024 e Best+2018), nas duas épocas, porque o SIMBAD demora a absorver catálogos novos | ✅ |
 | 5 | **Triagem assistida por LLM**: prioriza os candidatos por consistência com uma anã L, T ou Y. A LLM ordena esforço humano, **nunca dá o veredito final**. O score varia entre rodadas (cerca de 1/3 dos candidatos mudam), então vale só como prioridade | ✅ |
-| 6 | **Inspeção visual humana** (app Streamlit): recortes unWISE e óptico com mira na posição, números, links pro WiseView, teste de movimento contra o AllWISE, busca por código e filtro por situação, decisão confirmar/dúvida/descartar gravada em `revisao_humana`. O notebook `inspecao_visual.ipynb` é a versão antiga, só com links | ✅ |
+| 6 | **Inspeção visual humana** (app Streamlit): recortes unWISE e óptico com mira na posição, animação do W2 por época, checklist com sugestão do pipeline, números, link pro WiseView, teste de movimento contra o AllWISE, busca por código e filtro por situação, decisão confirmar/dúvida/descartar gravada em `revisao_humana`. O notebook `inspecao_visual.ipynb` é a versão antiga, só com links | ✅ |
 | 7 | **Relatório** dos confirmados (HTML com imagens embutidas), gerado por botão no app ou por `python src/relatorio.py` (que também grava um CSV), pra enviar a um astrônomo e pedir uma segunda opinião. Manual, como a Fase 6 | ✅ |
 
 **Quanto os cortes deixam passar.** Os limiares foram medidos contra 949 anãs L/T/Y já conhecidas (`python tools/recall_conhecidas.py`, usa rede, ~8 min). Com os cortes atuais passam **76%** delas (L 80%, T 70%, Y 77%). Duas medições mudaram o desenho: filtrar o primeiro dígito do `pmcode` (A=1) derrubava o recall de 76% pra 25%, porque ele mede vizinhança e não qualidade; e cortar por SNR em W1 perdia metade das anãs Y. As conhecidas são as mais brilhantes, então o recall pra anãs ainda não descobertas tende a ser menor.
@@ -311,7 +317,10 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
 │   └── gerar_funil.py       # grafico do funil (docs/img/funil_fases.png), lido do banco
 ├── app/
 │   ├── revisao.py           # Fase 6: app Streamlit de revisao visual
-│   └── dados.py             # leitura/gravacao das revisoes e URLs dos recortes
+│   ├── dados.py             # leitura/gravacao das revisoes, URLs e checklist
+│   ├── imagens.py           # recortes e animacao do W2, compartilhados pelas paginas
+│   └── pages/
+│       └── treino.py        # modo treino: casos com resposta
 ├── tests/
 │   └── test_units.py        # testes de unidade offline
 ├── docs/img/                # figuras usadas neste README

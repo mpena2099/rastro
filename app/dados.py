@@ -1,11 +1,14 @@
 """Acesso a dados da Fase 6 (revisao visual): sem Streamlit, testavel offline."""
 
+import io
 import sqlite3
 from datetime import datetime
 from urllib.parse import urlencode
 
+import httpx
 import numpy as np
 import pandas as pd
+from PIL import Image
 
 DECISOES = ("confirmado", "duvida", "descartado")
 
@@ -224,3 +227,185 @@ WHERE 1=CONTAINS(POINT('ICRS',a.ra,a.dec), CIRCLE('ICRS',TAP_UPLOAD.t.ra,TAP_UPL
         linhas.append((x.source_id, classificar_allwise(desloc, sp, sa), sp, sa, desloc))
     return pd.DataFrame(linhas, columns=["source_id", "allwise_status", "allwise_sep_prevista",
                                          "allwise_sep_atual", "allwise_desloc_esperado"])
+
+
+# ---------------------------------------------------------------- checklist e sugestao
+ICONES_CHECKLIST = {"ok": "✅", "atencao": "⚠️", "problema": "❌"}
+
+
+def checklist(r: dict) -> list[dict]:
+    """Le os numeros do candidato em linguagem simples, um item por teste.
+
+    Chave ausente ou vazia vira 'atencao': sem dado nao da para avaliar.
+    """
+    def item(estado, titulo, explicacao):
+        return {"estado": estado, "titulo": titulo, "explicacao": explicacao}
+
+    def valor(chave):
+        v = r.get(chave)
+        if v is None:
+            return None
+        try:
+            return None if pd.isna(v) else v
+        except (TypeError, ValueError):
+            return v
+
+    itens = []
+    pm = valor("pm_signif")
+    if pm is None:
+        itens.append(item("atencao", "Movimento significativo",
+                          "Sem medida de movimento próprio para avaliar."))
+    elif pm >= 15:
+        itens.append(item("ok", "Movimento significativo",
+                          f"PM/σ = {pm:.1f}: o movimento é {pm:.1f} vezes maior que o erro da medida "
+                          "(o mínimo é 15)."))
+    else:
+        itens.append(item("atencao", "Movimento significativo",
+                          f"PM/σ = {pm:.1f}: abaixo de 15, o movimento pode ser só erro de medida."))
+
+    allwise = valor("allwise_status")
+    if allwise == "consistente":
+        itens.append(item("ok", "Teste do AllWISE",
+                          "Em ~2010 a fonte estava onde o movimento próprio prevê: o movimento é real."))
+    elif allwise == "parado":
+        itens.append(item("problema", "Teste do AllWISE",
+                          "Em ~2010 a fonte estava no mesmo lugar de hoje: não se moveu."))
+    elif allwise == "ambiguo":
+        itens.append(item("atencao", "Teste do AllWISE",
+                          "O AllWISE (~2010) vê fonte perto das duas posições e não decide."))
+    else:
+        itens.append(item("atencao", "Teste do AllWISE",
+                          "Sem teste no AllWISE (~2010), porque o candidato é fraco demais ou falta "
+                          "o dado. Isso não prova nada."))
+
+    detectada, g = valor("gaia_detectada"), valor("gaia_g")
+    if detectada is not None and not bool(detectada):
+        itens.append(item("ok", "Gaia", "Sem contraparte no Gaia: não é uma estrela comum brilhante."))
+    elif detectada is not None and g is not None and g < 19:
+        itens.append(item("problema", "Gaia",
+                          f"Contraparte no Gaia com G = {g:.1f}: estrela comum."))
+    elif detectada is not None and g is not None:
+        itens.append(item("atencao", "Gaia",
+                          f"Contraparte no Gaia com G = {g:.1f}, bem fraca: anãs L também podem "
+                          "aparecer. Confira a imagem."))
+    else:
+        itens.append(item("atencao", "Gaia",
+                          "Sem cruzamento com o Gaia: não dá para descartar estrela comum."))
+
+    cor = valor("cor_w1w2")
+    if cor is None:
+        itens.append(item("atencao", "Cor W1-W2",
+                          "Sem as magnitudes W1 e W2: não dá para avaliar a cor."))
+    elif cor >= 1.0:
+        itens.append(item("ok", "Cor W1-W2",
+                          f"Cor W1-W2 = {cor:.2f}: bem avermelhada, como as anãs T e Y."))
+    elif cor >= 0.3:
+        itens.append(item("ok", "Cor W1-W2", f"Cor W1-W2 = {cor:.2f}: faixa das anãs L."))
+    else:
+        itens.append(item("atencao", "Cor W1-W2",
+                          f"Cor W1-W2 = {cor:.2f}: pouco vermelha, pode ser uma anã M comum."))
+
+    ps1 = valor("ps1_detectada")
+    if ps1 is None:
+        itens.append(item("atencao", "Óptico Pan-STARRS",
+                          "Sem cruzamento com o Pan-STARRS: não dá para avaliar o óptico."))
+    elif not bool(ps1):
+        itens.append(item("ok", "Óptico Pan-STARRS",
+                          "Não aparece no óptico: some no visível, como as anãs T e Y."))
+    elif cor is not None and cor < 0.5:
+        itens.append(item("atencao", "Óptico Pan-STARRS",
+                          "Aparece no óptico e a cor é pouco vermelha: pode ser estrela comum."))
+    else:
+        itens.append(item("ok", "Óptico Pan-STARRS",
+                          "Aparece no óptico: anãs L também aparecem, então não descarta sozinho."))
+    return itens
+
+
+def sugestao(itens: list[dict]) -> str:
+    """Resumo do checklist: um problema descarta, uma atencao vira duvida."""
+    estados = {i["estado"] for i in itens}
+    if "problema" in estados:
+        return "descartado"
+    return "duvida" if "atencao" in estados else "confirmado"
+
+
+# ---------------------------------------------------------------- animacao do WiseView
+BLINK_API = "https://moo23y1au0.execute-api.us-west-2.amazonaws.com/default/png-animation"
+BLINK_S3 = "https://amnh-citsci-public.s3-us-west-2.amazonaws.com"
+
+
+def url_blink(ra: float, dec: float, tamanho_px: int = 24) -> str:
+    """Animacao de epocas do W2 do WiseView: devolve JSON com os quadros (ims) e os MJDs."""
+    q = urlencode({"ra": ra, "dec": dec, "band": 2, "size": tamanho_px, "max_dyr": 0,
+                   "minbright": -50, "maxbright": 500, "invert": 1, "stretch": 1, "diff": 0,
+                   "scandir": 0, "outer": 0, "neowise": 0, "window": 0.5, "diff_window": 1,
+                   "unique": 1, "smooth_scan": 0, "shift": 0, "pmx": 0, "pmy": 0,
+                   "synth_a": 0, "synth_b": 0})
+    return f"{BLINK_API}?{q}"
+
+
+def epocas_blink(ra: float, dec: float, tamanho_px: int = 24) -> list[tuple[float, Image.Image]]:
+    """(ano, imagem) de cada epoca do W2, em ordem. Uma nova tentativa se falhar.
+
+    O servidor leva ate ~1 min; os quadros vem de graca do S3 do WiseView.
+    """
+    for tentativa in range(2):
+        try:
+            r = httpx.get(url_blink(ra, dec, tamanho_px), timeout=120)
+            r.raise_for_status()
+            d = r.json()
+            saida = []
+            for caminho, mjd in zip(d["ims"], d["mjds"]):
+                img = httpx.get(f"{BLINK_S3}/{caminho}", timeout=120)
+                img.raise_for_status()
+                ano = 2000.0 + (float(np.median(mjd)) - 51544.5) / 365.25
+                saida.append((ano, Image.open(io.BytesIO(img.content))))
+            return sorted(saida, key=lambda x: x[0])
+        except Exception:
+            if tentativa == 1:
+                raise
+
+
+# ---------------------------------------------------------------- modo treino
+def casos_treino(conhecidas: pd.DataFrame, estrelas: pd.DataFrame, rejeitados: pd.DataFrame,
+                 n_por_classe: int = 10, semente: int = 42) -> pd.DataFrame:
+    """Casos rotulados do modo treino, sorteados por classe e misturados.
+
+    conhecidas: anas L/T/Y confirmadas (data/recall_conhecidas.pkl), estratificadas por tipo.
+    estrelas: candidatos_fase4 com status='conhecido' (estrela comum de alto movimento).
+    rejeitados: campo_bruto fora de candidatos_fase3; o corte de PM >= 0.3 e feito aqui.
+    """
+    from src.proper_motion import add_pm_columns
+
+    def preparar(df):
+        df = add_pm_columns(df) if {"pmra", "pmdec", "w1mpro", "w2mpro"} <= set(df) else df.copy()
+        for col in ("pm_total", "pm_signif", "cor_w1w2"):
+            if col not in df:
+                df[col] = np.nan
+        # sem posicao ou sem os numeros nao da para mostrar o caso no treino
+        return df.dropna(subset=["ra", "dec", "pm_total", "pm_signif", "cor_w1w2", "w2mpro"])
+
+    def linha(x):
+        return {"ra": x.ra, "dec": x.dec, "pm_total": x.pm_total, "pm_signif": x.pm_signif,
+                "cor_w1w2": x.cor_w1w2, "w2mpro": x.w2mpro}
+
+    linhas = []
+    for _, grupo in preparar(conhecidas).groupby("tipo"):
+        for x in grupo.sample(min(n_por_classe, len(grupo)), random_state=semente).itertuples():
+            linhas.append({**linha(x), "resposta": "confirmado",
+                           "explicacao": f"Anã {x.sp_type} conhecida: {x.main_id}"})
+    e = preparar(estrelas)
+    for x in e.sample(min(n_por_classe, len(e)), random_state=semente).itertuples():
+        nome = getattr(x, "simbad_match_id", "sem nome")
+        linhas.append({**linha(x), "resposta": "descartado",
+                       "explicacao": f"Estrela comum de alto movimento já catalogada ({nome}): "
+                                     "brilha no óptico."})
+    rej = preparar(rejeitados)
+    rej = rej[rej["pm_total"] >= 0.3]
+    for x in rej.sample(min(n_por_classe, len(rej)), random_state=semente).itertuples():
+        linhas.append({**linha(x), "resposta": "descartado",
+                       "explicacao": "O filtro de qualidade da Fase 3 rejeitou: movimento provavelmente "
+                                     "falso (artefato, mistura de fontes ou ajuste ruim)."})
+    colunas = ["ra", "dec", "pm_total", "pm_signif", "cor_w1w2", "w2mpro", "resposta", "explicacao"]
+    return pd.DataFrame(linhas, columns=colunas).sample(frac=1, random_state=semente).reset_index(
+        drop=True)
