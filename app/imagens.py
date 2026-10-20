@@ -1,6 +1,8 @@
 """Recortes e animacao de movimento, compartilhados pelas paginas Streamlit."""
 
 import io
+import threading
+from concurrent.futures import Future, ThreadPoolExecutor
 
 import httpx
 import streamlit as st
@@ -8,8 +10,15 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from app import dados
+from config import ROOT
 
 LADO = 330
+# Recortes e animacoes nao mudam: ficam em disco e sobrevivem a reinicios do app
+CACHE_DIR = ROOT / "data" / "cache_imagens"
+# Pre-carga dos proximos itens em segundo plano (modulo importado uma vez por servidor)
+_executor = ThreadPoolExecutor(max_workers=3)
+_em_andamento: dict[str, Future] = {}
+_trava = threading.Lock()
 
 # NEO7 empilha todas as epocas do WISE (2010 a 2020), entao nao mostra movimento:
 # camadas mais antigas (NEO2, NEO4) sao quase identicas a ela. Movimento se ve na
@@ -38,9 +47,8 @@ def _mira(img: Image.Image) -> Image.Image:
     return img
 
 
-@st.cache_data(show_spinner=False)
-def _recorte(ra: float, dec: float, camada: str):
-    """Baixa o recorte e marca a posicao do candidato (mira com folga no centro)."""
+def _baixar_recorte(ra: float, dec: float, camada: str) -> bytes:
+    """Recorte do Legacy Surveys ja em 330 px, como PNG (sem a mira)."""
     url = dados.url_recorte(ra, dec, camada)
     for tentativa in range(2):
         try:
@@ -52,7 +60,64 @@ def _recorte(ra: float, dec: float, camada: str):
             if tentativa == 1:
                 raise
     img = img.resize((LADO, LADO), Image.NEAREST if img.size[0] < 100 else Image.LANCZOS)
-    return _mira(img)
+    saida = io.BytesIO()
+    img.save(saida, format="PNG")
+    return saida.getvalue()
+
+
+def _chave_recorte(ra: float, dec: float, camada: str) -> str:
+    return f"{ra:.6f}_{dec:+.6f}_{camada}.png"
+
+
+def _chave_animacao(ra: float, dec: float, tamanho_px: int) -> str:
+    return f"{ra:.6f}_{dec:+.6f}_w2_{tamanho_px}.gif"
+
+
+def _gravar(chave: str, gerar) -> bytes:
+    conteudo = gerar()
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = CACHE_DIR / f"{chave}.tmp"
+    tmp.write_bytes(conteudo)
+    tmp.replace(CACHE_DIR / chave)
+    return conteudo
+
+
+def _do_cache(chave: str, gerar) -> bytes:
+    """Do disco; se a pre-carga ja esta baixando, espera ela em vez de baixar de novo."""
+    arquivo = CACHE_DIR / chave
+    if arquivo.exists():
+        return arquivo.read_bytes()
+    with _trava:
+        futuro = _em_andamento.get(chave)
+    if futuro is not None:
+        return futuro.result()
+    return _gravar(chave, gerar)
+
+
+def _recorte(ra: float, dec: float, camada: str):
+    png = _do_cache(_chave_recorte(ra, dec, camada), lambda: _baixar_recorte(ra, dec, camada))
+    return _mira(Image.open(io.BytesIO(png)).convert("RGB"))
+
+
+def _terminou(chave: str, _futuro: Future) -> None:
+    with _trava:
+        _em_andamento.pop(chave, None)
+
+
+def pre_carregar(posicoes: list[tuple[float, float]], tamanho_px: int = 24) -> None:
+    """Baixa em segundo plano recortes e animacao dos proximos itens (falha e ignorada)."""
+    for ra, dec in posicoes:
+        tarefas = [(_chave_recorte(ra, dec, c), lambda ra=ra, dec=dec, c=c: _baixar_recorte(ra, dec, c))
+                   for c, _ in CAMADAS]
+        tarefas.append((_chave_animacao(ra, dec, tamanho_px),
+                        lambda ra=ra, dec=dec: _gerar_gif(ra, dec, tamanho_px)))
+        for chave, gerar in tarefas:
+            with _trava:
+                if (CACHE_DIR / chave).exists() or chave in _em_andamento:
+                    continue
+                futuro = _executor.submit(_gravar, chave, gerar)
+                _em_andamento[chave] = futuro
+            futuro.add_done_callback(lambda f, chave=chave: _terminou(chave, f))
 
 
 def animacao(ra: float, dec: float, tamanho_px: int = 24):
@@ -63,9 +128,12 @@ def animacao(ra: float, dec: float, tamanho_px: int = 24):
         return None
 
 
-@st.cache_data(show_spinner=False)
 def _animacao(ra: float, dec: float, tamanho_px: int = 24) -> bytes:
-    """Quadros do W2 por época em 330 px, com a mira e o ano escrito (500 ms cada, em loop)."""
+    return _do_cache(_chave_animacao(ra, dec, tamanho_px), lambda: _gerar_gif(ra, dec, tamanho_px))
+
+
+def _gerar_gif(ra: float, dec: float, tamanho_px: int = 24) -> bytes:
+    """Quadros do W2 por época em 330 px, com a mira e o ano escrito (em loop)."""
     fonte = ImageFont.load_default(size=26)
     quadros = []
     epocas = dados.epocas_blink(ra, dec, tamanho_px)

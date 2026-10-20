@@ -16,3 +16,4 @@ data/rastro.db
 .env
 data/recall_conhecidas.pkl
 data/relatorio/
+data/cache_imagens/

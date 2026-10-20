@@ -202,13 +202,15 @@ nav[2].markdown(f"**{st.session_state.pos + 1} de {total}** na fila  |  `{sid}` 
                 f"RA {r['ra']:.5f}, Dec {r['dec']:+.5f}")
 
 completar_animacao = imagens.mostrar(float(r["ra"]), float(r["dec"]))
+_pos = st.session_state.pos
+imagens.pre_carregar([(float(x.ra), float(x.dec)) for x in fila.iloc[_pos + 1:_pos + 4].itertuples()])
 st.caption("Recortes de 60\" x 60\", norte pra cima e leste à esquerda. A mira verde marca a "
            "posição do CatWISE (~2015). Um objeto real e próximo aparece no infravermelho; "
            "um ponto só no óptico é fonte comum. Na animação, as fontes aparecem escuras e cada quadro é uma época do W2 "
            "(WiseView) e o ano está no canto. Imagens: unWISE (NASA/WISE), Legacy Surveys (DESI) "
            "e WiseView.")
 st.markdown(f"[Abrir no Legacy Surveys]({dados.link_legacy_viewer(r['ra'], r['dec'])})  |  "
-            f"[Abrir no WiseView (movimento em épocas)]({dados.link_wiseview(r['ra'], r['dec'])})")
+            f"[WiseView (para dúvidas: campo maior, contraste e diferença entre épocas)]({dados.link_wiseview(r['ra'], r['dec'])})")
 
 gaia_flag = None if pd.isna(r["gaia_detectada"]) else bool(r["gaia_detectada"])
 ps1_flag = None if pd.isna(r["ps1_detectada"]) else bool(r["ps1_detectada"])

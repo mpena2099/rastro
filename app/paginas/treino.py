@@ -76,6 +76,8 @@ if pos >= len(st.session_state.casos) - 1:
 nav[2].markdown(f"**Caso {pos + 1} de {len(st.session_state.casos)}**")
 
 completar_animacao = imagens.mostrar(float(c["ra"]), float(c["dec"]))
+imagens.pre_carregar([(float(x.ra), float(x.dec))
+                      for x in st.session_state.casos.iloc[pos + 1:pos + 4].itertuples()])
 
 esquerda, direita = st.columns([3, 2])
 with esquerda:
