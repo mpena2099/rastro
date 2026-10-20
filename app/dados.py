@@ -338,7 +338,7 @@ def url_blink(ra: float, dec: float, tamanho_px: int = 24) -> str:
     """Animacao de epocas do W2 do WiseView: devolve JSON com os quadros (ims) e os MJDs."""
     q = urlencode({"ra": ra, "dec": dec, "band": 2, "size": tamanho_px, "max_dyr": 0,
                    "minbright": -50, "maxbright": 500, "invert": 1, "stretch": 1, "diff": 0,
-                   "scandir": 0, "outer": 0, "neowise": 0, "window": 0.5, "diff_window": 1,
+                   "scandir": 0, "outer": 0, "neowise": 0, "window": 2, "diff_window": 1,
                    "unique": 1, "smooth_scan": 0, "shift": 0, "pmx": 0, "pmy": 0,
                    "synth_a": 0, "synth_b": 0})
     return f"{BLINK_API}?{q}"

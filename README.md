@@ -194,14 +194,14 @@ Revisar os candidatos (Fases 6 e 7), depois que a Fase 4 tiver rodado:
 streamlit run app/revisao.py
 ```
 
-O app abre no navegador com a fila de candidatos pendentes e sem contraparte no Gaia, com os que o AllWISE mostra se movendo primeiro e depois do mais ao menos significativo. Na primeira abertura ele cruza a lista com Gaia, Pan-STARRS e AllWISE (alguns segundos).
+O app abre no navegador com a fila de candidatos pendentes e sem contraparte no Gaia, com os que o AllWISE mostra se movendo primeiro e depois do mais ao menos significativo. Na primeira abertura ele cruza a lista com Gaia, Pan-STARRS e AllWISE (alguns segundos). As páginas ficam em `app/paginas/` (`fila.py` para a revisão e `treino.py` para o treino), e o tema escuro e os componentes visuais vêm de `.streamlit/config.toml` e `app/estilo.py`.
 
 Na barra lateral:
 - **Situação:** pendentes, confirmados, dúvidas, descartados ou todos, cada um com a contagem. É por aqui que se revê o que já foi classificado.
 - **Buscar por código:** acha qualquer candidato pelo código (ou pelo final dele), em qualquer situação.
 - **Filtros** de Gaia, Pan-STARRS, movimento no AllWISE, PM/σ mínimo e nota da IA, e a **ordenação**.
 - **Já foi publicado?** Um botão consulta o VizieR inteiro em volta do candidato e destaca os catálogos de anãs ou de movimento próprio, com a distância. A Fase 4 só cruza as listas conhecidas, e é assim que se acha um catálogo novo que ainda não entrou nelas. Use antes de confirmar. O relatório da Fase 7 faz a mesma busca para cada candidato.
-- **Relatório (Fase 7):** o botão "Gerar relatório" monta uma página HTML com os confirmados (ou confirmados e dúvidas, se marcar a caixa) e o botão "Baixar relatório" entrega o arquivo. Leva alguns segundos por candidato, para baixar os recortes.
+- **Relatório (Fase 7):** no corpo da página, o botão "Gerar relatório" monta uma página HTML com os confirmados (ou confirmados e dúvidas, se marcar a caixa) e o botão "Baixar relatório" entrega o arquivo. Leva alguns segundos por candidato, para baixar os recortes.
 - No corpo da página, o quadro "Fila completa" lista a fila, e um clique numa linha abre aquele candidato.
 
 **O teste do AllWISE.** O AllWISE mediu o céu uns 5 anos antes do CatWISE. Se o movimento próprio de um candidato for real, a fonte tem de aparecer lá na posição recuada pelo movimento, e não onde ela está hoje. O app marca cada candidato como *se moveu (confere)*, *não se moveu*, *ambíguo*, *sem fonte* ou *PM baixo demais pra testar*. O AllWISE é mais raso que o CatWISE, então um candidato fraco quase sempre cai em "sem fonte", e isso não prova nada.
@@ -316,11 +316,15 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
 │   ├── gerar_referencias.py # folhas de referencia da revisao (docs/img/ref_*.jpg)
 │   └── gerar_funil.py       # grafico do funil (docs/img/funil_fases.png), lido do banco
 ├── app/
-│   ├── revisao.py           # Fase 6: app Streamlit de revisao visual
+│   ├── revisao.py           # Fase 6: router do app Streamlit de revisao visual
+│   ├── estilo.py            # tema escuro, cabecalho, ficha e checklist (CSS/HTML)
 │   ├── dados.py             # leitura/gravacao das revisoes, URLs e checklist
 │   ├── imagens.py           # recortes e animacao do W2, compartilhados pelas paginas
-│   └── pages/
+│   └── paginas/
+│       ├── fila.py          # revisao visual: fila, imagens e decisao
 │       └── treino.py        # modo treino: casos com resposta
+├── .streamlit/
+│   └── config.toml          # tema escuro e barra de ferramentas minima
 ├── tests/
 │   └── test_units.py        # testes de unidade offline
 ├── docs/img/                # figuras usadas neste README

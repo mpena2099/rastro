@@ -4,7 +4,8 @@ import io
 
 import httpx
 import streamlit as st
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+import numpy as np
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from app import dados
 
@@ -67,9 +68,14 @@ def _animacao(ra: float, dec: float, tamanho_px: int = 24) -> bytes:
     """Quadros do W2 por época em 330 px, com a mira e o ano escrito (500 ms cada, em loop)."""
     fonte = ImageFont.load_default(size=26)
     quadros = []
-    for ano, img in dados.epocas_blink(ra, dec, tamanho_px):
-        # o brilho fixo do WiseView deixa fonte fraca quase invisivel; contraste por quadro
-        q = ImageOps.autocontrast(img.convert("L"), cutoff=1).convert("RGB").resize((LADO, LADO), Image.NEAREST)
+    epocas = dados.epocas_blink(ra, dec, tamanho_px)
+    # o brilho fixo do WiseView some com fonte fraca, e contraste por quadro vira chuvisco:
+    # esticamento unico para a pilha toda e suavizacao leve antes de ampliar
+    pilha = np.stack([np.asarray(img.convert("L"), dtype=float) for _, img in epocas]) if epocas else None
+    lo, hi = np.percentile(pilha, [1, 99.5]) if pilha is not None else (0, 1)
+    for (ano, _), px in zip(epocas, pilha if pilha is not None else []):
+        q = Image.fromarray(np.clip((px - lo) / max(hi - lo, 1e-6) * 255, 0, 255).astype("uint8"))
+        q = q.filter(ImageFilter.GaussianBlur(0.8)).resize((LADO, LADO), Image.BICUBIC).convert("RGB")
         _mira(q)
         ImageDraw.Draw(q).text((6, 6), f"{ano:.1f}", fill=(0, 255, 0), font=fonte)
         quadros.append(q)
