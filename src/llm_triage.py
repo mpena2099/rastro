@@ -21,6 +21,7 @@ from config import (
     LLM_REQUEST_DELAY_S,
     LLM_BATCH_SIZE,
 )
+from src.known_catalog_match import acumular, ler_tabela
 
 VEREDITOS = ("alta", "media", "baixa", "incerta")
 
@@ -235,10 +236,15 @@ def run():
     print(f"API key: {('...' + api_key[-4:]) if api_key else '(sem chave)'}")
 
     conn = sqlite3.connect(str(SQLITE_PATH))
+    antigas = ler_tabela(conn, "candidatos_fase5")
     df = pd.read_sql("SELECT * FROM candidatos_fase4 WHERE status = 'candidato'", conn)
+    # campos anteriores ja triados nao voltam para a LLM: so os que ainda nao
+    # estao em candidatos_fase5 (a cota do free tier e o gargalo)
+    if antigas is not None and not antigas.empty:
+        df = df[~df["source_id"].isin(antigas["source_id"])]
     df = df.sort_values("pm_total", ascending=False).head(LLM_BATCH_SIZE)
 
-    print(f"Candidatos a triar: {len(df)} (top {LLM_BATCH_SIZE} por PM)")
+    print(f"Candidatos a triar: {len(df)} (top {LLM_BATCH_SIZE} por PM, so os novos)")
 
     df["llm_triage_score"] = None
     df["llm_triage_notes"] = None
@@ -259,12 +265,14 @@ def run():
             df.at[i, "llm_triage_notes"] = f"ERRO: {e}"
             df.at[i, "llm_triage_score"] = "erro"
 
-    df.to_sql("candidatos_fase5", conn, if_exists="replace", index=False)
+    salvos = acumular(antigas, df)
+    salvos.to_sql("candidatos_fase5", conn, if_exists="replace", index=False)
     conn.close()
-    print(f"\nSalvo em {SQLITE_PATH} (tabela: candidatos_fase5)")
+    print(f"\nSalvo em {SQLITE_PATH} (tabela: candidatos_fase5: {len(df)} novos, "
+          f"{len(salvos)} no total)")
 
     print("\nResumo:")
-    print(df["llm_triage_score"].value_counts().to_string())
+    print(salvos["llm_triage_score"].value_counts().to_string())
     return df
 
 

@@ -11,7 +11,23 @@ import pandas as pd
 import streamlit as st
 
 from app import dados, imagens
-from config import ROOT, SQLITE_PATH
+from config import REDE_PRAZO_S, ROOT, SQLITE_PATH
+from src.util import com_prazo
+
+# Como ler as imagens, mostrado no topo do guia
+LEITURA = ("**Como ler as imagens.** Uma anã marrom é fria (abaixo de ~2000 °C) e brilha quase só "
+           "no infravermelho. O satélite WISE fotografa o céu em dois infravermelhos, W1 e W2; "
+           "quanto mais fria, mais ela brilha em W2 do que em W1 (cor W1-W2 alta). Na imagem 1, "
+           "W1 vira azul e W2 vira laranja, então um objeto frio aparece laranja ou avermelhado. "
+           "A imagem 2 é luz visível: anã T ou Y quase não aparece, e estrela comum aparece "
+           "brilhante. A imagem 3 junta fotos do W2 tiradas em anos diferentes: uma anã perto do "
+           "Sol anda no céu, e o ponto escuro muda de lugar quadro a quadro.\n\n"
+           "**O que decide.** As três imagens juntas: ponto compacto e laranja no infravermelho "
+           "(1), nada ou quase nada no óptico (2) e movimento contínuo (3). Se faltar uma, "
+           "Dúvida ou Descartar. No checklist, dois itens pesam contra de verdade: Gaia (a "
+           "contraparte brilha demais no visível para ser fria, G-W2 abaixo de 5) e Teste do "
+           "AllWISE parado (em 2010 o objeto já estava no mesmo lugar, então o movimento era "
+           "falso). Cor W1-W2, significância do movimento e óptico do Pan-STARRS só reforçam.")
 
 # imagem -> (titulo, pergunta que o revisor responde olhando)
 ROTEIRO = {
@@ -43,7 +59,7 @@ def _tipos_simbad(nomes: list[str]) -> pd.DataFrame:
         from astroquery.simbad import Simbad
         s = Simbad()
         s.add_votable_fields("otype", "sp_type")
-        t = s.query_objects(nomes).to_pandas()
+        t = com_prazo(lambda: s.query_objects(nomes), REDE_PRAZO_S).to_pandas()
         return (t.rename(columns={"user_specified_id": "simbad_match_id"})
                 [["simbad_match_id", "otype", "sp_type"]].drop_duplicates("simbad_match_id"))
     except Exception:
@@ -118,6 +134,7 @@ def mostrar_guia(casos: pd.DataFrame | None, aberto: bool,
     """Expander com o roteiro e os exemplos; devolve a função que baixa as imagens."""
     lugares = []
     with st.expander("O que procurar em cada imagem (com exemplos)", expanded=aberto):
+        st.markdown(LEITURA)
         figs = exemplos(casos, excluir) if casos is not None and not casos.empty else {}
         for chave, (titulo, pergunta) in ROTEIRO.items():
             st.markdown(f"**{titulo}.** {pergunta}")

@@ -11,6 +11,7 @@ venv/
 
 # Dados / resultados (SQLite regeneravel pelo pipeline)
 data/rastro.db
+data/pipeline.log
 
 # Segredos locais
 .env

@@ -16,6 +16,7 @@ Rodar a partir da raiz do repositório (o `sys.path` e os caminhos em `config.py
 python3 -m venv venv && source venv/bin/activate   # se ainda não existir
 pip install -r requirements.txt
 python -u pipeline.py               # -u: print sai na hora mesmo com saída redirecionada
+python -u pipeline.py --proximo     # próximo bloco 5x5 do céu, escolhido por src/campos.py
 ```
 
 Rodar uma fase isolada (cada módulo expõe `run()`):
@@ -39,7 +40,7 @@ Fase 4 known_catalog_match→ candidatos_fase4   (lê candidatos_fase3; adiciona
 Fase 5 llm_triage         → candidatos_fase5   (lê candidatos_fase4 WHERE status='candidato')
 ```
 
-A Fase 1 não grava no banco; só valida e imprime.
+A Fase 1 não grava no banco; só valida e imprime. `candidatos_fase4` e `candidatos_fase5` acumulam entre campos (`known_catalog_match.acumular`, troca só o mesmo `source_id`), e a Fase 5 só manda à LLM quem ainda não está em `candidatos_fase5`. O `pipeline.py` grava o campo em `campos_feitos` no fim; `--proximo` usa `src/campos.py` (blocos 5x5 alinhados ao campo do config, do mais perto ao mais longe, pulando |b| < 20°). O botão "Buscar mais candidatas" da fila (`app/execucao.py`, mesmo código do Vagalume) roda o `--proximo` em segundo plano, com confirmação, progresso e cancelamento.
 
 **`config.py` é a fonte única de toda parametrização** (coordenadas do campo, limiares de PM/SNR/flags, alvos de sanidade, modelo LLM, caminhos). Alterar comportamento do pipeline = editar `config.py`, não os módulos. Os caminhos derivam de `ROOT = config.py.parent`, ou seja, a raiz do repositório.
 
@@ -56,3 +57,5 @@ O `score` (`alta`/`baixa`/`incerta`/`media`) vem do modo texto (default) ou, com
 Código, prints e nomes de tabela/coluna são em português. Ao adicionar uma fase nova, siga o contrato existente: função `run()` que lê a tabela anterior do SQLite, processa com pandas e grava a próxima tabela. Mantenha os prints de progresso (o pipeline é interativo e longo).
 
 **Fases manuais (fora do `pipeline.py`):** Fase 6 é o app Streamlit `app/revisao.py` (grava `revisao_humana`, tabela que o pipeline não recria, e `cruzamentos_app`, o Gaia/Pan-STARRS/AllWISE de cada candidato: só candidato novo é cruzado ao abrir o app, e `treino_historico`, uma linha por resposta do treino); recortes e animação do WiseView ficam em `data/cache_imagens/` (`app/imagens.py`), e cada página pré-carrega em segundo plano os 3 itens seguintes; `app/guia.py` tem a pergunta de cada imagem (legenda), os exemplos bom x ruim tirados dos casos do treino e a pista mostrada depois de responder. Fase 7 é `src/relatorio.py`: no app, o botão "Gerar relatório" chama `relatorio.gerar_html` sobre o DataFrame que o app já cruzou e oferece o HTML por download (`gerar_html` também roda `dados.buscar_vizier`, a busca no VizieR inteiro que destaca catálogos de anãs ou de movimento próprio, e o app tem o mesmo botão por candidato); pela linha de comando, `python src/relatorio.py [--duvidas]` lê `revisao_humana`, refaz Gaia/Pan-STARRS/AllWISE só pros escolhidos e grava `data/relatorio/relatorio.html` (imagens embutidas) e `candidatos.csv`. O app também tem o modo treino em `app/paginas/treino.py` (casos com resposta), com as duas páginas roteadas por `app/revisao.py` e o tema escuro em `app/estilo.py` e `.streamlit/config.toml`, e a animação do movimento (quadros do W2 por época do WiseView, em `app/imagens.py`), mostrada ao lado dos dois recortes.
+
+**Testar o app:** com `streamlit.testing.v1.AppTest`, rode contra uma cópia do banco (`RASTRO_DB=/tmp/copia.db`, lido em `config.SQLITE_PATH`). Os botões de decisão e do treino gravam em `revisao_humana` e `treino_historico`; no banco real, o clique de teste vira revisão de verdade.

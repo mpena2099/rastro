@@ -5,14 +5,15 @@ from astroquery.ipac.irsa import Irsa
 from astroquery.simbad import Simbad
 import astropy.units as u
 
-from config import SANITY_TARGETS, CATWISE_TABLE
+from config import CATWISE_TABLE, REDE_PRAZO_S, SANITY_TARGETS
+from src.util import com_prazo
 from src.proper_motion import add_pm_columns
 
 
 def _retry(fn, servico: str, retries: int = 3, delay: float = 5.0):
     for attempt in range(retries):
         try:
-            return fn()
+            return com_prazo(fn, REDE_PRAZO_S)
         except Exception as e:
             if attempt < retries - 1:
                 print(f"  {servico} retry {attempt+1}/{retries}: {e}")

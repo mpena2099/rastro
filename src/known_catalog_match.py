@@ -6,8 +6,9 @@ from astropy.table import Table
 from astroquery.xmatch import XMatch
 import astropy.units as u
 
-from config import (CATALOGOS_ANAS, CATALOGOS_RAIO_ARCSEC, SQLITE_PATH, SIMBAD_RADIUS_ARCSEC,
-                    SIMBAD_DELAY_S)
+from config import (CATALOGOS_ANAS, CATALOGOS_RAIO_ARCSEC, REDE_PRAZO_S, SQLITE_PATH,
+                    SIMBAD_DELAY_S, SIMBAD_RADIUS_ARCSEC)
+from src.util import com_prazo
 
 
 MJD_J2000 = 51544.5
@@ -49,9 +50,9 @@ def _cruzar_catalogos(df: pd.DataFrame) -> pd.DataFrame:
             for ra, dec in posicoes:
                 t = Table({"source_id": cand["source_id"].values, "ra": ra.values,
                            "dec": dec.values})
-                r = XMatch.query(cat1=t, cat2=f"vizier:{tabela}",
-                                 max_distance=CATALOGOS_RAIO_ARCSEC * u.arcsec,
-                                 colRA1="ra", colDec1="dec")
+                r = com_prazo(lambda: XMatch.query(
+                    cat1=t, cat2=f"vizier:{tabela}", max_distance=CATALOGOS_RAIO_ARCSEC * u.arcsec,
+                    colRA1="ra", colDec1="dec"), REDE_PRAZO_S)
                 ids |= {str(s) for s in r["source_id"]}
         except Exception as e:
             # uma lista fora do ar nao derruba a fase; o SIMBAD ja filtrou o grosso
@@ -83,13 +84,13 @@ def run():
 
     print("Enviando batch p/ CDS XMatch (SIMBAD)...")
     try:
-        result = XMatch.query(
+        result = com_prazo(lambda: XMatch.query(
             cat1=t,
             cat2="simbad",
             max_distance=SIMBAD_RADIUS_ARCSEC * u.arcsec,
             colRA1="ra",
             colDec1="dec",
-        )
+        ), REDE_PRAZO_S)
     except Exception as e:
         print(f"XMatch falhou: {e}")
         print("Caindo p/ consulta individual lenta...")
@@ -122,6 +123,22 @@ def run():
     return _gravar(df_result)
 
 
+def ler_tabela(conn: sqlite3.Connection, nome: str) -> pd.DataFrame | None:
+    """Tabela do banco, ou None se ainda nao existe (primeira rodada)."""
+    try:
+        return pd.read_sql(f"SELECT * FROM {nome}", conn)
+    except Exception:
+        return None
+
+
+def acumular(antiga: pd.DataFrame | None, nova: pd.DataFrame) -> pd.DataFrame:
+    """Junta a tabela antiga com a nova; a linha nova substitui a mesma source_id."""
+    if antiga is None or antiga.empty:
+        return nova
+    return pd.concat([antiga[~antiga["source_id"].isin(nova["source_id"])], nova],
+                     ignore_index=True)
+
+
 def _gravar(df_result: pd.DataFrame) -> pd.DataFrame:
     df_result = _cruzar_catalogos(df_result)
     conhecidos = df_result[df_result["status"] == "conhecido"]
@@ -132,9 +149,11 @@ def _gravar(df_result: pd.DataFrame) -> pd.DataFrame:
     print(f"Candidatos (seguem): {len(candidatos)}")
 
     conn = sqlite3.connect(str(SQLITE_PATH))
-    df_result.to_sql("candidatos_fase4", conn, if_exists="replace", index=False)
+    salvos = acumular(ler_tabela(conn, "candidatos_fase4"), df_result)
+    salvos.to_sql("candidatos_fase4", conn, if_exists="replace", index=False)
     conn.close()
-    print(f"Salvo em {SQLITE_PATH} (tabela: candidatos_fase4)")
+    print(f"Salvo em {SQLITE_PATH} (tabela: candidatos_fase4: {len(df_result)} deste "
+          f"campo, {len(salvos)} no total)")
 
     return df_result
 
@@ -150,7 +169,8 @@ def _fallback_sequential(df):
         coord = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame="icrs")
         for attempt in range(3):
             try:
-                r = Simbad.query_region(coord, radius=SIMBAD_RADIUS_ARCSEC * u.arcsec)
+                r = com_prazo(lambda: Simbad.query_region(coord, radius=SIMBAD_RADIUS_ARCSEC * u.arcsec),
+                              REDE_PRAZO_S)
                 if r and len(r) > 0:
                     return str(r[0]["main_id"])
                 return None

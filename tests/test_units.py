@@ -329,5 +329,101 @@ def test_resumo_treino():
     assert "periodo" not in r
 
 
+def test_com_prazo():
+    import time
+    from src.util import com_prazo
+    assert com_prazo(lambda: 7, 1) == 7
+    try:
+        com_prazo(lambda: time.sleep(5), 0.2)
+        assert False, "devia estourar o prazo"
+    except TimeoutError:
+        pass
+    try:
+        com_prazo(lambda: 1 / 0, 1)
+        assert False
+    except ZeroDivisionError:
+        pass
+
+
+def test_campos_grade():
+    from astropy.coordinates import SkyCoord
+    from src import campos
+    g = campos.grade()
+    inicial = g[0]
+    assert inicial["nome"] == "ra148-153_dec+18+23"
+    assert (inicial["ra_min"], inicial["ra_max"]) == tuple(config.FIELD_RA_RANGE)
+    assert (inicial["dec_min"], inicial["dec_max"]) == tuple(config.FIELD_DEC_RANGE)
+    assert len({b["nome"] for b in g}) == len(g)
+    assert all(b["dec_min"] >= campos.DEC_MIN and b["dec_max"] <= campos.DEC_MAX for b in g)
+    # ordenada pela distancia angular ao centro do bloco inicial
+    centro = SkyCoord(sum(config.FIELD_RA_RANGE) / 2,
+                      sum(config.FIELD_DEC_RANGE) / 2, unit="deg")
+    dist = [SkyCoord((b["ra_min"] + b["ra_max"]) / 2,
+                     (b["dec_min"] + b["dec_max"]) / 2, unit="deg").separation(centro).deg
+            for b in g]
+    assert dist == sorted(dist)
+
+
+def test_campos_proximo():
+    from src import campos
+    g = campos.grade()
+    inicial = g[0]
+    assert campos.proximo([])["nome"] == inicial["nome"]
+    assert campos.proximo([inicial])["nome"] != inicial["nome"]
+    # tudo antes do primeiro bloco do plano galactico feito: ele e pulado
+    plano = next(i for i, b in enumerate(g)
+                 if campos.latitude_galactica(b) < campos.B_GALACTICO_MIN)
+    saltado = campos.proximo(g[:plano + 1])
+    esperado = next(b for b in g[plano + 1:]
+                    if campos.latitude_galactica(b) >= campos.B_GALACTICO_MIN)
+    assert saltado["nome"] == esperado["nome"]
+    assert campos.latitude_galactica(saltado) >= campos.B_GALACTICO_MIN
+    assert campos.proximo(g) is None
+
+
+def test_campos_feitos_sqlite():
+    import sqlite3
+    from src import campos
+    conn = sqlite3.connect(":memory:")
+    assert campos.ler_feitos(conn) == []
+    inicial = campos.grade()[0]
+    campos.registrar(conn, inicial, 120)
+    linhas = campos.ler_feitos(conn)
+    assert len(linhas) == 1 and linhas[0]["nome"] == inicial["nome"]
+    assert linhas[0]["candidatos"] == 120
+    campos.registrar(conn, inicial, 300)  # mesmo nome: regrava, nao duplica
+    assert campos.ler_feitos(conn)[0]["candidatos"] == 300
+
+
+def test_estado_execucao():
+    from app.execucao import estado
+    vazio = estado("")
+    assert vazio["fase"] is None and not vazio["terminou"] and vazio["erro"] is None
+    log = """  Proximo campo: ra148-153_dec+18+23 (RA 148-153, Dec +18 a +23)
+  Executando: Fase 4 - SIMBAD cross-match
+  120/500 (0 erros)
+  Executando: Fase 5 - LLM triage
+"""
+    e = estado(log)
+    assert e["campo"].startswith("ra148-153") and e["fase"] == "Fase 5 - LLM triage"
+    assert e["progresso"] is None  # fase nova zera o progresso da anterior
+    assert estado(log + "  50/500\n")["progresso"] == (50, 500)
+    assert estado(log + "\nERRO em Fase 5 - LLM triage: timeout\n")["erro"].startswith("ERRO em")
+    assert estado(log + "  Campo x registrado em campos_feitos.\n")["terminou"]
+    assert estado("  A grade de campos acabou: todos\n")["fim_da_grade"]
+    assert not e["cancelada"] and estado(log + "\nBusca cancelada pelo app.\n")["cancelada"]
+
+
+def test_acumular_fase4():
+    from src.known_catalog_match import acumular
+    antiga = pd.DataFrame({"source_id": ["a", "b"], "pm_total": [1.0, 2.0]})
+    nova = pd.DataFrame({"source_id": ["b", "c"], "pm_total": [9.0, 3.0]})
+    out = acumular(antiga, nova)
+    assert out["source_id"].tolist() == ["a", "b", "c"]
+    assert out.set_index("source_id").loc["b", "pm_total"] == 9.0
+    assert acumular(None, nova).equals(nova)
+    assert acumular(pd.DataFrame(), nova).equals(nova)
+
+
 if __name__ == "__main__":
     _main()

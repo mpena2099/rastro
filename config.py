@@ -1,9 +1,16 @@
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).parent
-SQLITE_PATH = ROOT / "data" / "rastro.db"
+# RASTRO_DB aponta para outra copia do banco: testes do app (AppTest) clicam em botoes que
+# gravam decisoes, e no banco real elas viravam revisao de verdade
+SQLITE_PATH = Path(os.environ.get("RASTRO_DB", ROOT / "data" / "rastro.db"))
 
 CATWISE_TABLE = "catwise_2020"
+
+# prazo de relogio de uma chamada de rede (util.com_prazo); um ladrilho de 1 grau no IRSA
+# leva alguns minutos, por isso folgado
+REDE_PRAZO_S = 600
 CATWISE_COLUMNS = [
     "source_id", "ra", "dec",
     "w1mpro", "w2mpro", "w1snr", "w2snr",

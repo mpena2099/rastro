@@ -12,9 +12,11 @@ from config import (
     FIELD_STEP_DEG,
     PM_THRESHOLD_ARCSEC,
     W2SNR_MIN,
+    REDE_PRAZO_S,
     ROW_LIMIT,
     SQLITE_PATH,
 )
+from src.util import com_prazo
 
 MAX_SPLIT_DEPTH = 4
 QUERY_RETRIES = 3
@@ -40,16 +42,18 @@ WHERE ra BETWEEN {ra_min} AND {ra_max}
 """
 
 
-def make_tiles() -> list[tuple[float, float, float, float]]:
-    """Ladrilhos (ra_min, ra_max, dec_min, dec_max) que cobrem a regiao do config."""
+def make_tiles(ra_range=None, dec_range=None) -> list[tuple[float, float, float, float]]:
+    """Ladrilhos (ra_min, ra_max, dec_min, dec_max) que cobrem a regiao pedida."""
+    ra_range = ra_range or FIELD_RA_RANGE
+    dec_range = dec_range or FIELD_DEC_RANGE
     tiles = []
-    ra = FIELD_RA_RANGE[0]
-    while ra < FIELD_RA_RANGE[1] - 1e-9:
-        dec = FIELD_DEC_RANGE[0]
-        while dec < FIELD_DEC_RANGE[1] - 1e-9:
+    ra = ra_range[0]
+    while ra < ra_range[1] - 1e-9:
+        dec = dec_range[0]
+        while dec < dec_range[1] - 1e-9:
             tiles.append((
-                round(ra, 6), round(min(ra + FIELD_STEP_DEG, FIELD_RA_RANGE[1]), 6),
-                round(dec, 6), round(min(dec + FIELD_STEP_DEG, FIELD_DEC_RANGE[1]), 6),
+                round(ra, 6), round(min(ra + FIELD_STEP_DEG, ra_range[1]), 6),
+                round(dec, 6), round(min(dec + FIELD_STEP_DEG, dec_range[1]), 6),
             ))
             dec += FIELD_STEP_DEG
         ra += FIELD_STEP_DEG
@@ -59,8 +63,7 @@ def make_tiles() -> list[tuple[float, float, float, float]]:
 def _query_retry(query: str) -> pd.DataFrame:
     for attempt in range(QUERY_RETRIES):
         try:
-            result = Irsa.query_tap(query)
-            return result.to_table().to_pandas()
+            return com_prazo(lambda: Irsa.query_tap(query).to_table().to_pandas(), REDE_PRAZO_S)
         except Exception as e:
             if attempt < QUERY_RETRIES - 1:
                 print(f"    IRSA retry {attempt+1}/{QUERY_RETRIES}: {e}")
@@ -92,13 +95,17 @@ def fetch_tile(ra_min, ra_max, dec_min, dec_max, depth: int = 0) -> pd.DataFrame
     return pd.concat(partes, ignore_index=True)
 
 
-def run():
+def run(campo=None):
     print("=" * 50)
     print("Fase 2 — Query CatWISE2020 via TAP")
     print("=" * 50)
 
-    tiles = make_tiles()
-    print(f"RA: {FIELD_RA_RANGE}  Dec: {FIELD_DEC_RANGE}  ladrilho: {FIELD_STEP_DEG} grau")
+    ra_range = (campo["ra_min"], campo["ra_max"]) if campo else FIELD_RA_RANGE
+    dec_range = (campo["dec_min"], campo["dec_max"]) if campo else FIELD_DEC_RANGE
+    tiles = make_tiles(ra_range, dec_range)
+    if campo:
+        print(f"Campo: {campo['nome']}")
+    print(f"RA: {ra_range}  Dec: {dec_range}  ladrilho: {FIELD_STEP_DEG} grau")
     print(f"Ladrilhos: {len(tiles)}")
     print(f"PM threshold: {PM_THRESHOLD_ARCSEC} arcsec/ano")
     print(f"Row limit por consulta: {ROW_LIMIT}")

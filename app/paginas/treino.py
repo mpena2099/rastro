@@ -12,6 +12,10 @@ import streamlit as st
 from app import dados, estilo, imagens, guia
 from config import ROOT, SQLITE_PATH
 
+DESCRICAO = ("Casos de resposta conhecida (anãs já catalogadas, estrelas comuns e rejeitados pelo "
+             "filtro de qualidade), para aprender a decidir antes da revisão de verdade. Você "
+             "responde e vê a resposta certa, a explicação e onde estava a pista. Nada muda nos "
+             "candidatos; só o seu histórico de acertos é gravado.")
 ROTULOS = {"confirmado": "Confirmado", "duvida": "Dúvida", "descartado": "Descartado"}
 
 
@@ -76,10 +80,8 @@ c = st.session_state.casos.iloc[pos]
 respondidos = len(st.session_state.respostas)
 
 estilo.cabecalho("Treino", (st.session_state.pontos, respondidos),
-                 "Acertos {atual} de {total}")
-st.caption("O caso vem sem a resposta. Decida olhando as imagens e os números, como na revisão. "
-           "Gaia, Pan-STARRS e AllWISE não entram aqui: o checklist marca como atenção o que falta. "
-           "Só o seu histórico de acertos é gravado.")
+                 "Acertos {atual} de {total}", DESCRICAO)
+st.caption("Gaia, Pan-STARRS e AllWISE não entram aqui: o checklist marca como atenção o que falta.")
 mostrar_historico()
 
 nav = st.columns([1, 1, 1, 5])

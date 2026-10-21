@@ -41,6 +41,7 @@ button[kind="primary"], button[kind="primary"] p { color: var(--rastro-fundo) !i
 }
 .rastro-tagline { margin-left: .7rem; font-size: .85rem; color: var(--rastro-suave); }
 .rastro-subtitulo { font-size: .95rem; color: var(--rastro-texto); }
+.rastro-descricao { font-size: .85rem; color: var(--rastro-suave); margin-top: .2rem; max-width: 46rem; }
 .rastro-progresso { min-width: 190px; text-align: right; }
 .rastro-progresso-texto {
     font-size: .85rem; color: var(--rastro-texto); margin-bottom: .35rem; white-space: nowrap;
@@ -95,14 +96,15 @@ def _numero(valor) -> str:
 
 
 def cabecalho(subtitulo: str, progresso: tuple[int, int] | None = None,
-              rotulo_progresso: str = "{atual} de {total} revisados") -> None:
-    """Banner do topo: marca, tagline, subtitulo e progresso com barra."""
+              rotulo_progresso: str = "{atual} de {total} revisados", descricao: str = "") -> None:
+    """Banner do topo: marca, tagline, subtitulo, descricao da pagina e progresso com barra."""
     partes = [
         '<div class="rastro-cabecalho">',
         '<div class="rastro-marca">',
         f'<div><span class="rastro-nome">{ICON} {PROJECT}</span>'
         f'<span class="rastro-tagline">{html.escape(TAGLINE)}</span></div>',
         f'<div class="rastro-subtitulo">{html.escape(subtitulo)}</div>',
+        f'<div class="rastro-descricao">{html.escape(descricao)}</div>' if descricao else "",
         '</div>',
     ]
     if progresso:

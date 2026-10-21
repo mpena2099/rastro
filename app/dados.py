@@ -10,6 +10,9 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
+from config import REDE_PRAZO_S
+from src.util import com_prazo
+
 DECISOES = ("confirmado", "duvida", "descartado")
 
 # Cada revisao fica numa tabela propria: candidatos_fase5 e refeita a cada
@@ -111,8 +114,8 @@ def buscar_vizier(ra: float, dec: float, pm_total: float) -> pd.DataFrame:
     from astroquery.vizier import Vizier
 
     raio = max(10.0, 16 * float(pm_total) + 5)
-    res = Vizier(columns=["_r"], row_limit=5, timeout=180).query_region(
-        SkyCoord(ra, dec, unit="deg"), radius=raio * u.arcsec)
+    res = com_prazo(lambda: Vizier(columns=["_r"], row_limit=5, timeout=180).query_region(
+        SkyCoord(ra, dec, unit="deg"), radius=raio * u.arcsec), REDE_PRAZO_S)
     linhas = []
     for nome in res.keys():
         t = res[nome]
@@ -146,8 +149,8 @@ def cruzar_gaia_ps1(df: pd.DataFrame) -> pd.DataFrame:
 
     def xmatch(ra, dec, cat, raio_arcsec):
         t = Table({"source_id": df["source_id"].values, "ra": ra, "dec": dec})
-        r = XMatch.query(cat1=t, cat2=cat, max_distance=raio_arcsec * u.arcsec,
-                         colRA1="ra", colDec1="dec").to_pandas()
+        r = com_prazo(lambda: XMatch.query(cat1=t, cat2=cat, max_distance=raio_arcsec * u.arcsec,
+                                           colRA1="ra", colDec1="dec"), REDE_PRAZO_S).to_pandas()
         return r.sort_values("angDist").drop_duplicates("source_id")
 
     out = df[["source_id"]].copy()
@@ -219,7 +222,8 @@ WHERE 1=CONTAINS(POINT('ICRS',a.ra,a.dec), CIRCLE('ICRS',TAP_UPLOAD.t.ra,TAP_UPL
         up = Table.from_pandas(d[["rid", "ra", "dec"]].iloc[i:i + lote])
         for tent in range(3):
             try:
-                partes.append(svc.run_sync(q, uploads={"t": up}).to_table().to_pandas())
+                partes.append(com_prazo(lambda: svc.run_sync(q, uploads={"t": up}).to_table().to_pandas(),
+                                        REDE_PRAZO_S))
                 break
             except Exception:
                 if tent == 2:

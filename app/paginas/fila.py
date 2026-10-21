@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import pandas as pd
 import streamlit as st
 
-from app import dados, estilo, imagens, guia
+from app import dados, estilo, execucao, imagens, guia
 from config import ROOT, SQLITE_PATH
 from src import relatorio
 
@@ -24,6 +24,10 @@ ALLWISE_ROTULO = {
     "consistente": "se moveu (confere)", "parado": "não se moveu", "ambiguo": "ambíguo",
     "sem fonte": "sem fonte (fraco?)", "sem teste": "PM baixo demais",
 }
+DESCRICAO = ("Candidatos a anã marrom: objetos que andam rápido no céu infravermelho e não estão "
+             "no SIMBAD nem nas listas de anãs. Para cada um, olhe as três imagens e o checklist "
+             "e decida: Confirmar, Dúvida ou Descartar. A decisão fica gravada, e as confirmadas "
+             "entram no relatório.")
 ROTULOS = {"confirmado": "Confirmado", "duvida": "Dúvida", "descartado": "Descartado"}
 
 
@@ -86,6 +90,94 @@ def limpar(source_id: str):
         dados.apagar_revisao(conn, source_id)
 
 
+def buscar():
+    st.session_state.confirmar_busca = False
+    if not execucao.rodando():  # clique duplo nao abre duas buscas
+        execucao.iniciar()
+
+
+def pedir_confirmacao(sim: bool):
+    st.session_state.confirmar_busca = sim
+
+
+def esquecer_busca():
+    execucao.LOG.unlink(missing_ok=True)
+
+
+def botao_buscar(chave: str):
+    # dois passos: um clique sem querer nao dispara horas de rede e de LLM
+    if st.session_state.get("confirmar_busca"):
+        st.warning("A busca leva algumas horas, porque a Fase 5 chama a LLM para cada "
+                   "candidato novo. Começar agora?")
+        sim, nao = st.columns(2)
+        sim.button("Sim, buscar", type="primary", on_click=buscar, key=f"{chave}_sim",
+                   width="stretch")
+        nao.button("Não", on_click=pedir_confirmacao, args=(False,), key=f"{chave}_nao",
+                   width="stretch")
+    else:
+        st.button("Buscar mais candidatas", type="primary", on_click=pedir_confirmacao,
+                  args=(True,), key=chave)
+    st.caption("Escolhe sozinho uma região do céu ainda não varrida e roda o pipeline "
+               "inteiro (algumas horas, por causa da triagem com LLM). Pode fechar a "
+               "página: a busca continua. Pelo terminal, na pasta do projeto:")
+    st.code(execucao.COMANDO, language="bash")
+
+
+@st.fragment(run_every=5)
+def progresso():
+    if not execucao.rodando():
+        st.rerun()  # terminou: recarrega a pagina inteira com os candidatos novos
+    log = execucao.ler_log()
+    e = execucao.estado(log)
+    if not log or e["terminou"] or e["erro"] or e["cancelada"]:  # log antigo: veio do terminal
+        st.info("Uma busca de candidatos está rodando, iniciada pelo terminal: o progresso "
+                "aparece lá. Os candidatos novos entram na fila quando ela terminar.")
+        return
+    minutos = execucao.minutos_desde_inicio()
+    with st.container(border=True):
+        st.markdown("**Buscando mais candidatos**"
+                    + (f" no campo {e['campo']}" if e["campo"] else ""))
+        texto = e["fase"] or "Escolhendo o campo"
+        if e["progresso"]:
+            i, n = e["progresso"]
+            st.progress(min(i / n, 1.0), text=f"{texto}: {i} de {n}")
+        else:
+            st.progress(0.0, text=texto)
+        st.caption(("" if minutos is None else f"{minutos:.0f} min desde o início. ")
+                   + "Pode fechar a página: a busca continua e os candidatos novos entram "
+                   "na fila.")
+        with st.expander("Ver o log"):
+            st.code("\n".join(execucao.ler_log().splitlines()[-15:]) or "(vazio)")
+        st.button("Cancelar busca", on_click=execucao.cancelar,
+                  help="Encerra agora. Esta região é refeita do início na próxima busca; "
+                       "suas decisões não são tocadas.")
+
+
+def painel_busca(pendentes: int):
+    """Busca de mais candidatos: progresso se roda; resultado da ultima; botao se a fila acabou."""
+    if execucao.rodando():
+        progresso()
+        return
+    e = execucao.estado(execucao.ler_log())
+    if e["fim_da_grade"]:
+        st.info("A grade de regiões do céu acabou: todas foram varridas. Para continuar, "
+                "ajuste a grade em `src/campos.py`.")
+    elif e["erro"]:
+        st.error(f"A última busca parou ({e['erro']}). Tentar de novo refaz a mesma região.")
+        botao_buscar("buscar_erro")
+        return
+    elif e["cancelada"]:
+        st.info("Busca cancelada. A região interrompida é refeita do início na próxima busca.")
+        st.button("Ok", on_click=esquecer_busca)
+    elif e["terminou"]:
+        st.success(f"Busca terminou{' no campo ' + e['campo'] if e['campo'] else ''}. "
+                   "Os candidatos novos já estão na fila.")
+        st.button("Ok", on_click=esquecer_busca)
+    if pendentes == 0:
+        st.success("Fila revisada: nenhum candidato pendente.")
+        botao_buscar("buscar_fim")
+
+
 # ---------------------------------------------------------------- dados
 try:
     with conectar() as conn:
@@ -97,10 +189,18 @@ except Exception as e:
 
 if todos.empty:
     st.warning("A tabela candidatos_fase4 não tem candidatos.")
+    painel_busca(0)
     st.stop()
 
 todos["decisao"] = todos["decisao"].fillna("pendente")
-estilo.cabecalho("Revisão visual", (int((todos["decisao"] != "pendente").sum()), len(todos)))
+pendentes = int((todos["decisao"] == "pendente").sum())
+estilo.cabecalho("Revisão visual", (int((todos["decisao"] != "pendente").sum()), len(todos)),
+                 descricao=DESCRICAO)
+painel_busca(pendentes)
+if pendentes and not execucao.rodando():
+    with st.sidebar.expander("Buscar mais candidatas"):
+        st.caption(f"Ainda há {pendentes} pendente(s): o ideal é revisar antes.")
+        botao_buscar("buscar_lateral")
 cruz, erros_cruz = cruzamentos(
     todos[["source_id", "ra", "dec", "pmra", "pmdec", "meanobsmjd"]])
 todos = todos.merge(cruz, on="source_id", how="left")

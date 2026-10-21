@@ -182,6 +182,7 @@ A partir da raiz do repositório:
 python3 -m venv venv && source venv/bin/activate   # se ainda nao existir
 pip install -r requirements.txt
 python -u pipeline.py       # roda as fases 1 a 5 em sequencia
+python -u pipeline.py --proximo  # escolhe sozinho o próximo bloco do céu e roda tudo
 ```
 
 `-u` faz o Python escrever cada `print` na hora. No terminal isso já acontece, mas com a saída redirecionada (`> log.txt`, `| tee log.txt`, `nohup`) o Python junta tudo em blocos e o log fica parado por minutos, parecendo travado, nas fases longas.
