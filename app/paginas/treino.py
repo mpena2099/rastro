@@ -19,8 +19,31 @@ def responder(i: int, decisao: str):
     if i in st.session_state.respostas:
         return
     st.session_state.respostas[i] = decisao
-    certa = st.session_state.casos.iloc[i]["resposta"]
-    st.session_state.pontos += 1.0 if decisao == certa else (0.5 if decisao == "duvida" else 0.0)
+    c = st.session_state.casos.iloc[i]
+    certa = c["resposta"]
+    pontos = 1.0 if decisao == certa else (0.5 if decisao == "duvida" else 0.0)
+    st.session_state.pontos += pontos
+    with sqlite3.connect(str(SQLITE_PATH)) as conn:
+        dados.salvar_tentativa(conn, f"{c['ra']:.5f},{c['dec']:.5f}", decisao, certa, pontos)
+
+
+def mostrar_historico():
+    """Aproveitamento de todas as sessoes, gravado no banco."""
+    with sqlite3.connect(str(SQLITE_PATH)) as conn:
+        r = dados.resumo_treino(dados.ler_tentativas(conn))
+    if not r:
+        return
+    with st.expander(f"Seu histórico: {r['geral']:.0%} de acerto em {r['respostas']} "
+                     f"{'resposta' if r['respostas'] == 1 else 'respostas'}"):
+        cols = st.columns(2 + len(r["por_certa"]))
+        cols[0].metric("Geral", f"{r['geral']:.0%}",
+                       help=f"{r['respostas']} respostas em {r['dias']} dia(s)")
+        cols[1].metric(f"Últimas {r['n_recentes']}", f"{r['recentes']:.0%}",
+                       delta=f"{(r['recentes'] - r['geral']) * 100:+.0f} pontos")
+        for col, (certa, (taxa, n)) in zip(cols[2:], r["por_certa"].items()):
+            col.metric(f"Quando era {ROTULOS[certa]}", f"{taxa:.0%}", help=f"{n} casos")
+        st.caption("Acerto muito diferente entre as colunas \"Quando era\" indica viés, por "
+                   "exemplo confirmar quase tudo. Dúvida vale meio ponto.")
 
 
 def mover(delta: int):
@@ -56,7 +79,8 @@ estilo.cabecalho("Treino", (st.session_state.pontos, respondidos),
                  "Acertos {atual} de {total}")
 st.caption("O caso vem sem a resposta. Decida olhando as imagens e os números, como na revisão. "
            "Gaia, Pan-STARRS e AllWISE não entram aqui: o checklist marca como atenção o que falta. "
-           "Nada é gravado, é só treino.")
+           "Só o seu histórico de acertos é gravado.")
+mostrar_historico()
 
 nav = st.columns([1, 1, 1, 5])
 nav[0].button("◀ Anterior", on_click=mover, args=(-1,), disabled=pos == 0, width="stretch")

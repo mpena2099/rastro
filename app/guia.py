@@ -90,7 +90,8 @@ def exemplos(casos: pd.DataFrame, excluir: tuple[float, float] | None = None) ->
 def pista(c: dict) -> str:
     """Em qual imagem estava a resposta deste caso, com os números dele."""
     explicacao = str(c.get("explicacao", ""))
-    pm = c.get("pm_total")
+    # NaN vem do pandas (to_dict): conta como ausente, senao o texto sai com "nan"
+    pm = None if pd.isna(c.get("pm_total")) else c.get("pm_total")
     if "Anã" in explicacao:
         tipo = explicacao.split()[1][0] if len(explicacao.split()) > 1 else ""
         otico = ("um pontinho vermelho fraco no óptico" if tipo == "L"
@@ -105,7 +106,7 @@ def pista(c: dict) -> str:
         return ("O SIMBAD já tem este objeto como estrela. Nas imagens, compare o óptico: estrela "
                 "comum costuma aparecer no visível, e a cor W1-W2 fica abaixo da de uma anã fria.")
     if "filtro de qualidade" in explicacao:
-        sig = c.get("pm_signif")
+        sig = None if pd.isna(c.get("pm_signif")) else c.get("pm_signif")
         extra = "" if sig is None else f" A significância do movimento é só {sig:.1f}."
         return ("Olhe o movimento: nenhum ponto anda de forma contínua, e no infravermelho "
                 f"não há uma fonte compacta e isolada.{extra}")

@@ -450,3 +450,52 @@ def casos_treino(conhecidas: pd.DataFrame, estrelas: pd.DataFrame, rejeitados: p
     colunas = ["ra", "dec", "pm_total", "pm_signif", "cor_w1w2", "w2mpro", "resposta", "explicacao"]
     return pd.DataFrame(linhas, columns=colunas).sample(frac=1, random_state=semente).reset_index(
         drop=True)
+
+
+# Historico do quiz: uma linha por resposta, para acompanhar a evolucao entre sessoes
+_SCHEMA_TREINO = """
+CREATE TABLE IF NOT EXISTS treino_historico (
+    respondido_em TEXT NOT NULL,
+    caso TEXT NOT NULL,
+    pergunta TEXT NOT NULL,
+    escolha TEXT NOT NULL,
+    certa TEXT NOT NULL,
+    pontos REAL NOT NULL
+)"""
+
+
+def salvar_tentativa(conn: sqlite3.Connection, caso: str, escolha: str, certa: str,
+                     pontos: float, pergunta: str = "decisao") -> None:
+    conn.execute(_SCHEMA_TREINO)
+    conn.execute("INSERT INTO treino_historico VALUES (?, ?, ?, ?, ?, ?)",
+                 (datetime.now().isoformat(timespec="seconds"), caso, pergunta, escolha, certa,
+                  float(pontos)))
+    conn.commit()
+
+
+def ler_tentativas(conn: sqlite3.Connection) -> pd.DataFrame:
+    conn.execute(_SCHEMA_TREINO)
+    return pd.read_sql("SELECT * FROM treino_historico ORDER BY respondido_em", conn)
+
+
+def resumo_treino(h: pd.DataFrame, recentes: int = 20) -> dict:
+    """Aproveitamento geral, nas ultimas respostas e por resposta certa.
+
+    O corte por resposta certa mostra vies: quem confirma quase tudo acerta os casos
+    "confirmado" e erra os "descartado". Vazio se ainda nao ha resposta.
+    """
+    d = h[h["pergunta"] == "decisao"]
+    if d.empty:
+        return {}
+
+    def taxa(x: pd.DataFrame) -> float:
+        return float(x["pontos"].mean())
+
+    r = {"respostas": len(d), "dias": int(d["respondido_em"].str[:10].nunique()),
+         "geral": taxa(d), "recentes": taxa(d.tail(recentes)),
+         "n_recentes": min(recentes, len(d)),
+         "por_certa": {c: (taxa(g), len(g)) for c, g in d.groupby("certa")}}
+    p = h[h["pergunta"] == "periodo"]
+    if not p.empty:
+        r["periodo"] = (taxa(p), len(p))
+    return r

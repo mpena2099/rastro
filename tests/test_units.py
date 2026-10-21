@@ -283,5 +283,51 @@ def test_guia_pista_e_exemplos():
     assert exemplos(casos, excluir=(1.0, 0.0))["movimento"][0]["ra"] == 2.0
 
 
+def test_guia_pista_casos_limite():
+    from app.guia import exemplos, pista
+    # 1"/ano em 14 anos = 14", ~5 pixels de 2,75"
+    assert '14"' in pista({"explicacao": "Anã T5 conhecida: X", "pm_total": 1.0})
+    assert "~5 pixels" in pista({"explicacao": "Anã T5 conhecida: X", "pm_total": 1.0})
+    for pm in (None, float("nan")):
+        txt = pista({"explicacao": "Anã Y0 conhecida: X", "pm_total": pm})
+        assert "anda" not in txt and "nan" not in txt
+    assert "nada no óptico" in pista({"explicacao": "Anã", "pm_total": None})
+    txt = pista({"explicacao": "O filtro de qualidade da Fase 3 rejeitou", "pm_signif": float("nan")})
+    assert "significância" not in txt and "nan" not in txt
+    assert "6.0" in pista({"explicacao": "O filtro de qualidade da Fase 3 rejeitou", "pm_signif": 6.0})
+    assert pista({}).startswith("Compare")
+    assert pista({"explicacao": "outra coisa"}).startswith("Compare")
+    # galaxia nunca recebe a pista de estrela
+    assert "SIMBAD" not in pista({"explicacao": "Galáxia catalogada no SIMBAD (X, G)"})
+    base = {"dec": [0.0] * 3, "pm_signif": [30, 20, 9], "w2mpro": [15, 15, 9]}
+    # sem ana T: o bom vem de qualquer confirmado (o de maior PM)
+    casos = pd.DataFrame({**base, "ra": [1.0, 2.0, 3.0], "pm_total": [0.5, 0.9, 0.3],
+                          "resposta": ["confirmado", "confirmado", "descartado"],
+                          "explicacao": ["Anã L2 conhecida: A", "Anã L5 conhecida: B",
+                                         "Estrela já catalogada no SIMBAD (C, PM*)"]})
+    ex = exemplos(casos)
+    assert ex["movimento"][0]["ra"] == 2.0
+    assert ex["movimento"][1] is None  # sem rejeitado da Fase 3, sem exemplo ruim
+    assert ex["ls-dr10"][1]["ra"] == 3.0
+    assert exemplos(casos.iloc[2:])["movimento"][0] is None
+
+
+def test_resumo_treino():
+    import sqlite3
+    from app.dados import ler_tentativas, resumo_treino, salvar_tentativa
+    conn = sqlite3.connect(":memory:")
+    assert resumo_treino(ler_tentativas(conn)) == {}
+    for escolha, certa, pontos in [("confirmado", "confirmado", 1.0),
+                                   ("confirmado", "descartado", 0.0),
+                                   ("duvida", "descartado", 0.5)]:
+        salvar_tentativa(conn, "1.00000,2.00000", escolha, certa, pontos)
+    r = resumo_treino(ler_tentativas(conn), recentes=2)
+    assert r["respostas"] == 3 and r["dias"] == 1
+    assert abs(r["geral"] - 0.5) < 1e-9 and abs(r["recentes"] - 0.25) < 1e-9
+    assert r["n_recentes"] == 2
+    assert r["por_certa"] == {"confirmado": (1.0, 1), "descartado": (0.25, 2)}
+    assert "periodo" not in r
+
+
 if __name__ == "__main__":
     _main()

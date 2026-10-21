@@ -84,7 +84,7 @@ A lista é de *suspeitos*, não de descobertas. O caminho depois dela:
 
 - **Checklist.** Abaixo dos números, o app marca com ✅, ⚠️ ou ❌ cinco testes (movimento, AllWISE, Gaia, cor W1-W2 e óptico) e fecha com "Sugestão do pipeline". A sugestão é só um resumo dos números: ela só vale se os dois testes humanos passarem, um ponto nítido no infravermelho dentro da mira e, na animação, o ponto andando sempre na mesma direção.
 - **Animação.** A terceira imagem mostra o movimento: quadros do W2 do unWISE por época, montados pelo servidor do WiseView, com a mira no lugar e o ano escrito em cada quadro. Se o servidor falhar, a página mostra um aviso e continua funcionando.
-- **Modo treino.** A página `treino`, na barra lateral do app, sorteia 50 casos já resolvidos: anãs L/T/Y conhecidas, estrelas comuns de alto movimento do SIMBAD e candidatos rejeitados pela Fase 3. O caso vem sem a resposta; depois do clique, o app mostra a resposta, a explicação e se você acertou. Dúvida vale meio ponto, e o placar fica na tela. Nada é gravado.
+- **Modo treino.** A página `treino`, na barra lateral do app, sorteia casos já resolvidos, o mesmo número para cada resposta: anãs L/T/Y conhecidas, estrelas comuns de alto movimento do SIMBAD e candidatos rejeitados pela Fase 3. O caso vem sem a resposta; depois do clique, o app mostra a resposta, a explicação e se você acertou. Dúvida vale meio ponto. Cada resposta fica gravada na tabela `treino_historico`, e o quadro "Seu histórico" mostra o acerto geral, o das últimas 20 respostas e o acerto separado por resposta certa: diferença grande entre eles indica viés, como confirmar quase tudo.
 
 **Casos de referência**
 
