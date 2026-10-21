@@ -428,10 +428,18 @@ def casos_treino(conhecidas: pd.DataFrame, estrelas: pd.DataFrame, rejeitados: p
         return df.dropna(subset=["ra", "dec", "pm_total", "pm_signif", "cor_w1w2", "w2mpro"])
 
     def linha(x):
+        # source_id proprio do treino: os cruzamentos ficam na mesma tabela da fila
         return {"ra": x.ra, "dec": x.dec, "pm_total": x.pm_total, "pm_signif": x.pm_signif,
-                "cor_w1w2": x.cor_w1w2, "w2mpro": x.w2mpro}
+                "cor_w1w2": x.cor_w1w2, "w2mpro": x.w2mpro,
+                "source_id": f"treino:{x.ra:.5f},{x.dec:.5f}",
+                "pmra": getattr(x, "pmra", np.nan), "pmdec": getattr(x, "pmdec", np.nan),
+                "meanobsmjd": getattr(x, "meanobsmjd", np.nan)}
 
     linhas = []
+    from src.quality_filter import passaria_na_fila
+    # so anas que passariam pelos filtros da fila real: uma Y fraca com movimento abaixo
+    # do erro e verdade, mas nao da para confirmar pelas imagens
+    conhecidas = conhecidas[passaria_na_fila(conhecidas).values]
     for _, grupo in preparar(conhecidas).groupby("tipo"):
         for x in grupo.sample(min(n_por_classe, len(grupo)), random_state=semente).itertuples():
             linhas.append({**linha(x), "resposta": "confirmado",
@@ -451,7 +459,8 @@ def casos_treino(conhecidas: pd.DataFrame, estrelas: pd.DataFrame, rejeitados: p
         linhas.append({**linha(x), "resposta": "descartado",
                        "explicacao": "O filtro de qualidade da Fase 3 rejeitou: movimento provavelmente "
                                      "falso (artefato, mistura de fontes ou ajuste ruim)."})
-    colunas = ["ra", "dec", "pm_total", "pm_signif", "cor_w1w2", "w2mpro", "resposta", "explicacao"]
+    colunas = ["ra", "dec", "pm_total", "pm_signif", "cor_w1w2", "w2mpro", "source_id", "pmra",
+               "pmdec", "meanobsmjd", "resposta", "explicacao"]
     return pd.DataFrame(linhas, columns=colunas).sample(frac=1, random_state=semente).reset_index(
         drop=True)
 

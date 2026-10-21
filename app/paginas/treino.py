@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import pandas as pd
 import streamlit as st
 
-from app import dados, estilo, imagens, guia
+from app import cruzamento, dados, estilo, imagens, guia
 from config import ROOT, SQLITE_PATH
 
 DESCRICAO = ("Casos de resposta conhecida (anãs já catalogadas, estrelas comuns e rejeitados pelo "
@@ -74,6 +74,15 @@ if "casos" not in st.session_state:
 if st.session_state.casos.empty:
     st.warning("Não há casos de treino.")
     st.stop()
+if not st.session_state.get("casos_cruzados"):
+    # mesmos cruzamentos da fila: sem eles o checklist marcava atencao em tudo
+    st.session_state.casos, _erros = cruzamento.completar(st.session_state.casos, "o treino", "caso")
+    # uma tentativa por sessao: repetir a cada clique esperaria o servidor fora do ar toda vez
+    st.session_state.casos_cruzados = True
+    st.session_state.erros_cruzamento = _erros
+if st.session_state.get("erros_cruzamento"):
+    st.warning("Algum catálogo não respondeu (Gaia, Pan-STARRS ou AllWISE): o checklist marca "
+               "atenção onde falta o dado. Na próxima sessão do treino ele tenta de novo.")
 
 pos = max(0, min(st.session_state.pos, len(st.session_state.casos) - 1))
 c = st.session_state.casos.iloc[pos]
@@ -81,7 +90,6 @@ respondidos = len(st.session_state.respostas)
 
 estilo.cabecalho("Treino", (st.session_state.pontos, respondidos),
                  "Acertos {atual} de {total}", DESCRICAO)
-st.caption("Gaia, Pan-STARRS e AllWISE não entram aqui: o checklist marca como atenção o que falta.")
 mostrar_historico()
 
 nav = st.columns([1, 1, 1, 5])

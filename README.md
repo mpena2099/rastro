@@ -84,7 +84,7 @@ A lista é de *suspeitos*, não de descobertas. O caminho depois dela:
 
 - **Checklist.** Abaixo dos números, o app marca com ✅, ⚠️ ou ❌ cinco testes (movimento, AllWISE, Gaia, cor W1-W2 e óptico) e fecha com "Sugestão do pipeline". A sugestão é só um resumo dos números: ela só vale se os dois testes humanos passarem, um ponto nítido no infravermelho dentro da mira e, na animação, o ponto andando sempre na mesma direção.
 - **Animação.** A terceira imagem mostra o movimento: quadros do W2 do unWISE por época, montados pelo servidor do WiseView, com a mira no lugar e o ano escrito em cada quadro. Se o servidor falhar, a página mostra um aviso e continua funcionando.
-- **Modo treino.** A página `treino`, na barra lateral do app, sorteia casos já resolvidos, o mesmo número para cada resposta: anãs L/T/Y conhecidas, estrelas comuns de alto movimento do SIMBAD e candidatos rejeitados pela Fase 3. O caso vem sem a resposta; depois do clique, o app mostra a resposta, a explicação e se você acertou. Dúvida vale meio ponto. Cada resposta fica gravada na tabela `treino_historico`, e o quadro "Seu histórico" mostra o acerto geral, o das últimas 20 respostas e o acerto separado por resposta certa: diferença grande entre eles indica viés, como confirmar quase tudo.
+- **Modo treino.** A página `treino`, na barra lateral do app, sorteia casos já resolvidos, o mesmo número para cada resposta: anãs L/T/Y conhecidas que passariam pelos mesmos filtros da fila (uma anã fraca demais para ver nas imagens não entra), estrelas comuns de alto movimento do SIMBAD e candidatos rejeitados pela Fase 3. Os casos são cruzados com Gaia, Pan-STARRS e AllWISE uma vez, como a fila, então o checklist e a sugestão funcionam igual à revisão. O caso vem sem a resposta; depois do clique, o app mostra a resposta, a explicação e se você acertou. Dúvida vale meio ponto. Cada resposta fica gravada na tabela `treino_historico`, e o quadro "Seu histórico" mostra o acerto geral, o das últimas 20 respostas e o acerto separado por resposta certa: diferença grande entre eles indica viés, como confirmar quase tudo.
 
 **Casos de referência**
 
@@ -195,7 +195,7 @@ Revisar os candidatos (Fases 6 e 7), depois que a Fase 4 tiver rodado:
 streamlit run app/revisao.py
 ```
 
-O app abre no navegador com a fila de candidatos pendentes e sem contraparte no Gaia, com os que o AllWISE mostra se movendo primeiro e depois do mais ao menos significativo. Na primeira abertura ele cruza a lista com Gaia, Pan-STARRS e AllWISE (alguns segundos). As páginas ficam em `app/paginas/` (`fila.py` para a revisão e `treino.py` para o treino), e o tema escuro e os componentes visuais vêm de `.streamlit/config.toml` e `app/estilo.py`.
+O app abre no navegador com a fila de candidatos pendentes e sem contraparte no Gaia, com os que o AllWISE mostra se movendo primeiro e depois do mais ao menos significativo. Na primeira abertura ele cruza a lista com Gaia, Pan-STARRS e AllWISE (alguns segundos). As páginas ficam em `app/paginas/` (`fila.py` para a revisão e `treino.py` para o treino), e o tema escuro e os componentes visuais vêm de `.streamlit/config.toml` e `app/estilo.py`. O guia "O que procurar em cada imagem" explica como ler as três imagens e o que decide. Quando a fila acabar, o botão "Buscar mais candidatas" (com confirmação, progresso e cancelamento) escolhe sozinho o próximo bloco do céu e roda o pipeline; o mesmo pelo terminal é `python -u pipeline.py --proximo`.
 
 Na barra lateral:
 - **Situação:** pendentes, confirmados, dúvidas, descartados ou todos, cada um com a contagem. É por aqui que se revê o que já foi classificado.
@@ -311,6 +311,8 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
 │   ├── known_catalog_match.py # Fase 4
 │   ├── llm_triage.py        # Fase 5
 │   ├── relatorio.py         # Fase 7: relatorio dos confirmados (HTML, e CSV pela linha de comando)
+│   ├── campos.py            # proximo bloco 5x5 do ceu para o --proximo
+│   ├── util.py              # prazo de relogio nas chamadas de rede
 │   └── proper_motion.py     # util (pm_total, cor_w1w2)
 ├── tools/
 │   ├── recall_conhecidas.py # mede o recall dos cortes contra anas conhecidas
@@ -321,6 +323,9 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
 │   ├── estilo.py            # tema escuro, cabecalho, ficha e checklist (CSS/HTML)
 │   ├── dados.py             # leitura/gravacao das revisoes, URLs e checklist
 │   ├── imagens.py           # recortes e animacao do W2, compartilhados pelas paginas
+│   ├── guia.py              # como ler as imagens, exemplos bom x ruim e pista do treino
+│   ├── cruzamento.py        # Gaia, Pan-STARRS e AllWISE, cruzados uma vez e guardados
+│   ├── execucao.py          # botao Buscar mais candidatas (pipeline em segundo plano)
 │   └── paginas/
 │       ├── fila.py          # revisao visual: fila, imagens e decisao
 │       └── treino.py        # modo treino: casos com resposta

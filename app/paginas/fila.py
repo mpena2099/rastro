@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import pandas as pd
 import streamlit as st
 
-from app import dados, estilo, execucao, imagens, guia
+from app import cruzamento, dados, estilo, execucao, imagens, guia
 from config import ROOT, SQLITE_PATH
 from src import relatorio
 
@@ -34,37 +34,6 @@ ROTULOS = {"confirmado": "Confirmado", "duvida": "Dúvida", "descartado": "Desca
 @st.cache_data(show_spinner=False)
 def vizier(ra: float, dec: float, pm_total: float) -> pd.DataFrame:
     return dados.buscar_vizier(ra, dec, pm_total)
-
-
-def cruzamentos(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
-    """Cruzamentos guardados no banco; so os candidatos novos vao ao Gaia/PS1/AllWISE.
-
-    Leva ~1 min por centena. Cruzamento que falha nao e gravado e volta na proxima abertura.
-    """
-    with conectar() as conn:
-        salvos = dados.ler_cruzamentos(conn)
-    faltam = df[~df["source_id"].isin(salvos["source_id"])]
-    if faltam.empty:
-        return salvos, []
-    novos, erros = faltam[["source_id"]].copy(), []
-    with st.status(f"Preparando a fila: cruzando {len(faltam)} candidato(s) novo(s), só desta vez",
-                   expanded=True) as status:
-        for nome, fn, tempo in (("Gaia DR3 e Pan-STARRS", dados.cruzar_gaia_ps1, "~10 s"),
-                                ("AllWISE (teste de movimento)", dados.cruzar_allwise, "~1 min")):
-            st.write(f"{nome} ({tempo})")
-            try:
-                novos = novos.merge(fn(faltam), on="source_id", how="left")
-            except Exception as e:
-                erros.append(f"{nome}: {e}")
-        if erros:
-            status.update(label="Cruzamento incompleto: tento de novo na próxima abertura",
-                          state="error", expanded=False)
-            return pd.concat([salvos, novos], ignore_index=True), erros
-        with conectar() as conn:
-            dados.salvar_cruzamentos(conn, novos)
-        status.update(label=f"Fila pronta: {len(faltam)} candidato(s) cruzado(s) e guardado(s)",
-                      state="complete", expanded=False)
-    return pd.concat([salvos, novos], ignore_index=True), []
 
 
 def conectar() -> sqlite3.Connection:
@@ -201,14 +170,7 @@ if pendentes and not execucao.rodando():
     with st.sidebar.expander("Buscar mais candidatas"):
         st.caption(f"Ainda há {pendentes} pendente(s): o ideal é revisar antes.")
         botao_buscar("buscar_lateral")
-cruz, erros_cruz = cruzamentos(
-    todos[["source_id", "ra", "dec", "pmra", "pmdec", "meanobsmjd"]])
-todos = todos.merge(cruz, on="source_id", how="left")
-for coluna, padrao in (("gaia_detectada", pd.NA), ("ps1_detectada", pd.NA), ("gaia_g", pd.NA),
-                       ("allwise_status", "sem dados")):
-    if coluna not in todos:
-        todos[coluna] = padrao
-todos["allwise_status"] = todos["allwise_status"].fillna("sem dados")
+todos, erros_cruz = cruzamento.completar(todos, "a fila", "candidato")
 todos["allwise_ordem"] = todos["allwise_status"].map(ALLWISE_ORDEM).fillna(2)
 
 todos["decisao"] = todos["decisao"].fillna("pendente")

@@ -1,7 +1,7 @@
 import sqlite3
 import pandas as pd
 
-from config import SQLITE_PATH, N_AW_MAX, PM_SIGNIF_MIN
+from config import N_AW_MAX, PM_SIGNIF_MIN, PM_THRESHOLD_ARCSEC, SQLITE_PATH, W2SNR_MIN
 from src.proper_motion import add_pm_columns
 
 
@@ -15,6 +15,25 @@ def pmcode_sem_troca(pmcode: pd.Series) -> pd.Series:
     # de primario), que nao custa recall.
     s = pmcode.fillna("").astype(str)
     return s.str[1] == "N"
+
+
+def mascara_fase3(df: pd.DataFrame) -> pd.Series:
+    """Cortes da Fase 3 (df ja com add_pm_columns)."""
+    return ((df["n_aw"] <= N_AW_MAX) & df["cc_flags"].isin(["", "0000"])
+            & (df["ab_flags"] == "00") & pmcode_sem_troca(df["pmcode"])
+            & (df["pm_signif"] >= PM_SIGNIF_MIN))
+
+
+def passaria_na_fila(df: pd.DataFrame) -> pd.Series:
+    """Cortes do servidor na Fase 2 mais os da Fase 3: o que chegaria a revisao.
+
+    Usado no treino: um caso que o pipeline nem mostraria (movimento abaixo do erro,
+    fonte fraca demais) nao da para decidir pelas imagens e so ensinaria errado.
+    """
+    df = add_pm_columns(df)
+    servidor = ((df["ka"] == 3) & (df["km"] == 3) & (df["pm_total"] > PM_THRESHOLD_ARCSEC)
+                & (df["w2snr"] >= W2SNR_MIN) & (df["w2flg"] < 8))
+    return servidor & mascara_fase3(df)
 
 
 def run():
@@ -47,7 +66,7 @@ def run():
     pm_signif = df["pm_signif"] >= PM_SIGNIF_MIN
     filtros.append((f"pm_total/sigma >= {PM_SIGNIF_MIN}", pm_signif.sum()))
 
-    mask = f5 & cc_clean & ab_clean & pmcode_good & pm_signif
+    mask = mascara_fase3(df)
     filtrado = df[mask].copy()
 
     print("\nFiltros aplicados:")
