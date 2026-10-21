@@ -129,6 +129,8 @@ with direita:
                 st.warning("Meio ponto: a dúvida vale metade.")
             else:
                 st.error(f"Errou: você marcou {ROTULOS[escolha]}.")
+            st.button("Próximo ▶", type="primary", on_click=mover, args=(+1,), key="proximo_baixo",
+                      disabled=pos >= len(st.session_state.casos) - 1)
 
 # a animacao do WiseView e a parte lenta: carrega por ultimo
 completar_animacao()
