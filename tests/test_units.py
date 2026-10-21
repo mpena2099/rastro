@@ -431,5 +431,47 @@ def test_acumular_fase4():
     assert acumular(pd.DataFrame(), nova).equals(nova)
 
 
+def _historico(linhas):
+    """treino_historico em memoria: (certa, pontos) em ordem."""
+    return pd.DataFrame([{"respondido_em": f"2026-10-21T10:{i:02d}:00", "caso": str(i),
+                          "pergunta": "decisao", "escolha": certa, "certa": certa, "pontos": p}
+                         for i, (certa, p) in enumerate(linhas)])
+
+
+def test_nivel_treino():
+    import sqlite3
+    from app import dados as dados_
+    assert dados_.nivel_treino(dados_.ler_tentativas(sqlite3.connect(":memory:")))[0] == "Aprendiz"
+    # menos de 20 respostas: Aprendiz mesmo acertando tudo
+    nivel, falta = dados_.nivel_treino(_historico([("confirmado", 1.0)] * 10))
+    assert nivel == "Aprendiz" and "faltam 10" in falta
+    # 60% nas ultimas 20: Revisor, e o que falta e o acerto recente
+    nivel, falta = dados_.nivel_treino(_historico(
+        [("confirmado", 1.0)] * 12 + [("descartado", 0.0)] * 8))
+    assert nivel == "Revisor" and "60%" in falta and "80%" in falta, (nivel, falta)
+    # 80% no total, mas so 60% nos casos Descartado: vies de confirmar demais
+    nivel, falta = dados_.nivel_treino(_historico(
+        [("confirmado", 1.0)] * 10 + [("descartado", 1.0)] * 6 + [("descartado", 0.0)] * 4))
+    assert nivel == "Revisor" and "Descartado" in falta and "confirmar demais" in falta
+    # 85% no total e pelo menos 70% em cada resposta certa
+    nivel, falta = dados_.nivel_treino(_historico(
+        [("confirmado", 1.0)] * 10 + [("descartado", 1.0)] * 7 + [("descartado", 0.0)] * 3))
+    assert nivel == "Revisor confiável" and falta == ""
+
+
+def test_marcos():
+    import sqlite3
+    from app import dados as dados_
+    conn = sqlite3.connect(":memory:")
+    m = dados_.marcos(conn)
+    assert [x["nome"] for x in m] == ["Treino em dia", "Fila revisada", "Confirmado defensável",
+                                      "Segunda opinião pedida", "Descoberta publicada"]
+    assert not any(x["feito"] for x in m)
+    dados_.marcar(conn, "Segunda opinião pedida", True)
+    assert dados_.marcos(conn)[3]["feito"]
+    dados_.marcar(conn, "Segunda opinião pedida", False)
+    assert not dados_.marcos(conn)[3]["feito"]
+
+
 if __name__ == "__main__":
     _main()

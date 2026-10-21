@@ -40,6 +40,11 @@ def conectar() -> sqlite3.Connection:
     return sqlite3.connect(str(SQLITE_PATH))
 
 
+def marcar_marco(nome: str):
+    with conectar() as conn:
+        dados.marcar(conn, nome, bool(st.session_state.get(f"marco_{nome}")))
+
+
 def mover(delta: int, total: int):
     st.session_state.pos = max(0, min(total - 1, st.session_state.pos + delta))
 
@@ -165,6 +170,13 @@ todos["decisao"] = todos["decisao"].fillna("pendente")
 pendentes = int((todos["decisao"] == "pendente").sum())
 estilo.cabecalho("Revisão visual", (int((todos["decisao"] != "pendente").sum()), len(todos)),
                  descricao=DESCRICAO)
+with conectar() as conn:
+    estilo.trilha_html(dados.marcos(conn))
+    manuais = dados.ler_marcos_manuais(conn)
+with st.expander("Marcar segunda opinião e publicação"):
+    for nome in dados.MARCOS_MANUAIS:
+        st.checkbox(nome, value=nome in manuais, key=f"marco_{nome}",
+                    on_change=marcar_marco, args=(nome,))
 painel_busca(pendentes)
 if pendentes and not execucao.rodando():
     with st.sidebar.expander("Buscar mais candidatas"):

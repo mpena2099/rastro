@@ -41,6 +41,18 @@ button[kind="primary"], button[kind="primary"] p { color: var(--rastro-fundo) !i
 }
 .rastro-tagline { margin-left: .7rem; font-size: .85rem; color: var(--rastro-suave); }
 .rastro-subtitulo { font-size: .95rem; color: var(--rastro-texto); }
+.rastro-trilha { display: flex; align-items: flex-start; background: var(--rastro-cartao);
+  border: 1px solid var(--rastro-borda); border-radius: .8rem; padding: .55rem .4rem;
+  margin-bottom: .8rem; }
+.rastro-etapa { flex: 1; min-width: 0; text-align: center; padding: 0 .35rem; position: relative; }
+.rastro-etapa + .rastro-etapa::before { content: ""; position: absolute; top: .36rem; left: -50%;
+  width: 100%; height: 2px; background: var(--rastro-borda); }
+.rastro-etapa.feito::before { background: var(--rastro-acento); }
+.rastro-ponto { width: .72rem; height: .72rem; border-radius: 50%; margin: 0 auto .3rem;
+  border: 2px solid var(--rastro-suave); position: relative; z-index: 1; }
+.rastro-etapa.feito .rastro-ponto { background: var(--rastro-acento); border-color: var(--rastro-acento); }
+.rastro-etapa-nome { font-size: .76rem; font-weight: 600; }
+.rastro-etapa-detalhe { color: var(--rastro-suave); font-size: .68rem; overflow-wrap: anywhere; }
 .rastro-descricao { font-size: .85rem; color: var(--rastro-suave); margin-top: .2rem; max-width: 46rem; }
 .rastro-progresso { min-width: 190px; text-align: right; }
 .rastro-progresso-texto {
@@ -150,3 +162,12 @@ def checklist_html(itens: list[dict], sugestao: str) -> None:
           'nítido no infravermelho, dentro da mira? e na animação o ponto anda sempre na mesma '
           'direção?</div></div>',
         unsafe_allow_html=True)
+
+
+def trilha_html(marcos: list[dict]) -> None:
+    etapas = "".join(
+        f'<div class="rastro-etapa{" feito" if m["feito"] else ""}"><div class="rastro-ponto"></div>'
+        f'<div class="rastro-etapa-nome">{html.escape(str(m["nome"]))}</div>'
+        f'<div class="rastro-etapa-detalhe">{html.escape(str(m["detalhe"]))}</div></div>'
+        for m in marcos)
+    st.markdown(f'<div class="rastro-trilha">{etapas}</div>', unsafe_allow_html=True)

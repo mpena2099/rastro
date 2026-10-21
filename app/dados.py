@@ -512,3 +512,90 @@ def resumo_treino(h: pd.DataFrame, recentes: int = 20) -> dict:
     if not p.empty:
         r["periodo"] = (taxa(p), len(p))
     return r
+
+
+# Marcos manuais ficam fora do to_sql replace pelo mesmo motivo das revisoes.
+_SCHEMA_MARCOS = """
+CREATE TABLE IF NOT EXISTS marcos_manuais (
+    nome TEXT PRIMARY KEY,
+    feito_em TEXT
+)"""
+
+MARCOS_MANUAIS = ("Segunda opinião pedida", "Descoberta publicada")
+_ROTULOS_CERTA = {"confirmado": "Confirmado", "duvida": "Dúvida", "descartado": "Descartado"}
+
+
+def marcar(conn: sqlite3.Connection, nome: str, feito: bool) -> None:
+    conn.execute(_SCHEMA_MARCOS)
+    if feito:
+        conn.execute("INSERT OR REPLACE INTO marcos_manuais VALUES (?, ?)",
+                     (nome, datetime.now().isoformat(timespec="seconds")))
+    else:
+        conn.execute("DELETE FROM marcos_manuais WHERE nome = ?", (nome,))
+    conn.commit()
+
+
+def ler_marcos_manuais(conn: sqlite3.Connection) -> set[str]:
+    conn.execute(_SCHEMA_MARCOS)
+    return {r[0] for r in conn.execute("SELECT nome FROM marcos_manuais")}
+
+
+def marcos(conn: sqlite3.Connection) -> list[dict]:
+    """Etapas do trabalho: acerto e avanco contam, confirmar candidato nao."""
+    r = resumo_treino(ler_tentativas(conn))
+    n = r.get("respostas", 0)
+    if n < 20:
+        treino = {"nome": "Treino em dia", "feito": False, "detalhe": f"faltam {20 - n} respostas"}
+    else:
+        treino = {"nome": "Treino em dia", "feito": r["recentes"] >= 0.8,
+                  "detalhe": f"{r['recentes']:.0%} nas últimas 20"}
+
+    try:
+        cand = carregar_candidatos(conn)
+        revisados = int(cand["decisao"].notna().sum())
+    except Exception:  # banco recem-criado, sem candidatos_fase4
+        cand, revisados = pd.DataFrame(), 0
+    fila = {"nome": "Fila revisada", "feito": bool(len(cand)) and revisados == len(cand),
+            "detalhe": f"{revisados} de {len(cand)}"}
+
+    # defensavel = confirmado no olho e com o movimento conferido pelo AllWISE (2010)
+    try:
+        fortes = conn.execute(
+            "SELECT COUNT(*) FROM revisao_humana r JOIN cruzamentos_app c USING (source_id) "
+            "WHERE r.decisao = 'confirmado' AND c.allwise_status = 'consistente'").fetchone()[0]
+    except sqlite3.Error:
+        fortes = 0
+    defensavel = {"nome": "Confirmado defensável", "feito": fortes > 0,
+                  "detalhe": (f"{fortes} com AllWISE consistente" if fortes
+                              else "confirmado com AllWISE consistente")}
+
+    manuais = ler_marcos_manuais(conn)
+    return [treino, fila, defensavel] + [
+        {"nome": nome, "feito": nome in manuais,
+         "detalhe": "marcado" if nome in manuais else "marque quando acontecer"}
+        for nome in MARCOS_MANUAIS]
+
+
+def nivel_treino(h: pd.DataFrame) -> tuple[str, str]:
+    """Nivel pelo acerto recente e pela constancia entre as respostas certas."""
+    d = h[h["pergunta"] == "decisao"]
+    if len(d) < 20:
+        return "Aprendiz", f"faltam {20 - len(d)} respostas para o próximo nível"
+    recentes = d.tail(20)
+    taxa = float(recentes["pontos"].mean())
+    if taxa < 0.6:
+        return "Aprendiz", (f"acerto nas últimas 20 em {taxa:.0%}: precisa de 60% para "
+                            "o nível Revisor")
+    fracas = {c: float(g["pontos"].mean()) for c, g in recentes.groupby("certa")}
+    fracas = {c: t for c, t in fracas.items() if t < 0.7}
+    if taxa >= 0.8 and not fracas:
+        return "Revisor confiável", ""
+    if taxa < 0.8:
+        return "Revisor", (f"acerto nas últimas 20 em {taxa:.0%}: precisa de 80% para "
+                           "Revisor confiável")
+    c = min(fracas, key=fracas.get)
+    dica = {"descartado": "cuidado com confirmar demais",
+            "confirmado": "cuidado com descartar demais",
+            "duvida": "use a dúvida só quando os painéis não decidem"}
+    return "Revisor", (f"acerto nos casos {_ROTULOS_CERTA.get(c, c)} abaixo de 70%: "
+                       f"{dica.get(c, 'equilibre as respostas')}")

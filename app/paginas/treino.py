@@ -90,8 +90,20 @@ respondidos = len(st.session_state.respostas)
 
 estilo.cabecalho("Treino", (st.session_state.pontos, respondidos),
                  "Acertos {atual} de {total}", DESCRICAO)
+# no treino so importa a primeira etapa da trilha: uma linha com o nivel e o que falta
+with sqlite3.connect(str(SQLITE_PATH)) as _conn:
+    _etapa = dados.marcos(_conn)[0]
+    _nivel, _falta = dados.nivel_treino(dados.ler_tentativas(_conn))
+st.info(f"**Nível: {_nivel}.** "
+        + ("Treino em dia ✅" if _etapa["feito"]
+           else f"Para \"Treino em dia\" (80% nas últimas 20): {_etapa['detalhe']}.")
+        # com poucas respostas a dica do nivel repete o que falta para a etapa
+        + (f" {_falta[0].upper()}{_falta[1:]}." if _falta and not _falta.startswith("faltam") else ""))
 mostrar_historico()
 
+# guia antes da navegacao: logo acima do caso ele parecia fazer parte dele
+completar_guia = guia.mostrar_guia(st.session_state.casos, aberto=pos == 0,
+                                   excluir=(float(c["ra"]), float(c["dec"])))
 nav = st.columns([1, 1, 1, 5])
 nav[0].button("◀ Anterior", on_click=mover, args=(-1,), disabled=pos == 0, width="stretch")
 nav[1].button("Próximo ▶", on_click=mover, args=(+1,),
@@ -100,8 +112,6 @@ if pos >= len(st.session_state.casos) - 1:
     nav[2].button("Recomeçar", on_click=recomecar, width="stretch")
 nav[3].markdown(f"**Caso {pos + 1} de {len(st.session_state.casos)}**")
 
-completar_guia = guia.mostrar_guia(st.session_state.casos, aberto=pos == 0,
-                                   excluir=(float(c["ra"]), float(c["dec"])))
 completar_animacao = imagens.mostrar(float(c["ra"]), float(c["dec"]),
                                      [f"**{t}.** {q}" for t, q in guia.ROTEIRO.values()])
 imagens.pre_carregar([(float(x.ra), float(x.dec))
