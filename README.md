@@ -12,6 +12,8 @@ Pipeline pessoal de mineração de dados astronômicos que caça **anãs marrons
 
 *A tela de revisão: para cada candidato, o recorte infravermelho, o óptico e a animação do movimento por época, com a pergunta de cada imagem e o progresso do trabalho no topo.*
 
+**[Experimente o treino online](https://rastro-treino.streamlit.app/?embed=true)**: casos de resposta conhecida, direto no navegador, sem instalar nada. As suas respostas ficam só na sua sessão.
+
 ## English summary
 
 Rastro is a personal data-mining pipeline that hunts for **uncatalogued brown dwarfs and cool stars near the Sun** through **high proper motion** in the public **CatWISE2020** catalogue (queried via IRSA TAP). Five automated phases share state through SQLite: a sanity check that recovers Luhman 16 and compares its measured proper motion, a tiled field download with server-side cuts, quality filtering (proper-motion significance, W2 SNR, contamination flags, pmcode), removal of known objects by cross-match with SIMBAD and 11 VizieR lists of ultracool dwarfs, and an LLM triage that only ranks, never decides. Two manual phases follow: a local Streamlit app for visual review (unWISE and Legacy Surveys cutouts, Gaia/Pan-STARRS counterparts, and a consistency test of the motion against AllWISE positions) and an HTML report for a second opinion. Recall against 949 known L/T/Y dwarfs from SIMBAD is about 76%. A 25 deg² scan (RA 148-153, Dec +18 to +23) left 237 candidates under review. The best one turned out to be already published as a photometric L5 candidate (Karpov et al. 2025), found independently; no discovery is claimed. Code and docs are in Portuguese; `config.py` holds every parameter. Run with `python pipeline.py`; offline tests with `python tests/test_units.py`.
