@@ -53,15 +53,23 @@ CONTRASTE = {
 }
 
 
+@st.cache_data(show_spinner=False)
+def _tipos_simbad_salvos(nomes: tuple[str, ...]) -> pd.DataFrame:
+    """Consulta o SIMBAD uma vez por processo; falha levanta erro e nao fica no cache."""
+    from astroquery.simbad import Simbad
+    s = Simbad()
+    s.add_votable_fields("otype", "sp_type")
+    t = com_prazo(lambda: s.query_objects(list(nomes)), REDE_PRAZO_S).to_pandas()
+    # o SIMBAD devolve o nome pedido com espacos no fim: sem o strip nenhum otype casava
+    t["user_specified_id"] = t["user_specified_id"].astype(str).str.strip()
+    return (t.rename(columns={"user_specified_id": "simbad_match_id"})
+            [["simbad_match_id", "otype", "sp_type"]].drop_duplicates("simbad_match_id"))
+
+
 def _tipos_simbad(nomes: list[str]) -> pd.DataFrame:
     """otype e sp_type de cada nome; vazio se o SIMBAD falhar (o treino usa texto generico)."""
     try:
-        from astroquery.simbad import Simbad
-        s = Simbad()
-        s.add_votable_fields("otype", "sp_type")
-        t = com_prazo(lambda: s.query_objects(nomes), REDE_PRAZO_S).to_pandas()
-        return (t.rename(columns={"user_specified_id": "simbad_match_id"})
-                [["simbad_match_id", "otype", "sp_type"]].drop_duplicates("simbad_match_id"))
+        return _tipos_simbad_salvos(tuple(nomes))
     except Exception:
         return pd.DataFrame(columns=["simbad_match_id", "otype", "sp_type"])
 

@@ -472,7 +472,8 @@ def casos_treino(conhecidas: pd.DataFrame, estrelas: pd.DataFrame, rejeitados: p
     e = preparar(estrelas)
     if "otype" in e:
         # ana marrom ou estrela ultrafria no SIMBAD nao e descarte claro neste projeto
-        e = e[~e["otype"].isin(OTIPOS_ULTRAFRIAS)]
+        # sem otype (SIMBAD fora do ar) nao da para garantir que nao e ana: fica fora do gabarito
+        e = e[e["otype"].notna() & ~e["otype"].isin(OTIPOS_ULTRAFRIAS)]
     for x in e.sample(min(n_por_classe, len(e)), random_state=semente).itertuples():
         linhas.append({**linha(x), "resposta": "descartado",
                        "explicacao": explicar_catalogado(getattr(x, "simbad_match_id", "sem nome"),

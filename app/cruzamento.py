@@ -22,7 +22,8 @@ ETAPAS = (("Gaia DR3 e Pan-STARRS", dados.cruzar_gaia_ps1, "~10 s", "gaia_detect
 def _com_relogio(fn, faltam: pd.DataFrame, nome: str, tempo: str) -> pd.DataFrame:
     """fn(faltam) com um relogio na tela: sem ele, uma consulta lenta parece travada."""
     marcador = st.empty()
-    with ThreadPoolExecutor(max_workers=1) as pool:
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
         futuro = pool.submit(fn, faltam)
         inicio = time.time()
         while not futuro.done():
@@ -33,6 +34,9 @@ def _com_relogio(fn, faltam: pd.DataFrame, nome: str, tempo: str) -> pd.DataFram
             time.sleep(1)
         marcador.empty()
         return futuro.result()
+    finally:
+        # sem esperar: se a pagina for recarregada no meio, a consulta lenta nao segura a nova
+        pool.shutdown(wait=False)
 
 
 def cruzar_e_guardar(df: pd.DataFrame, oque: str, item: str) -> tuple[pd.DataFrame, list[str]]:
@@ -50,17 +54,24 @@ def cruzar_e_guardar(df: pd.DataFrame, oque: str, item: str) -> tuple[pd.DataFra
             return df
         return df[df["source_id"].map(por_id[coluna]).isna()]
 
+    # etapa que falhou nesta sessao nao e tentada de novo a cada clique: esperaria o servidor
+    # fora do ar toda vez; volta na proxima sessao
+    falhas = st.session_state.setdefault("etapas_falhas", set())
     pendentes = [(e, sem(e[3])) for e in ETAPAS]
     pendentes = [(e, f) for e, f in pendentes if not f.empty]
+    erros = [f"{e[0]}: falhou nesta sessão, tento de novo na próxima" for e, _ in pendentes
+             if e[0] in falhas]
+    pendentes = [(e, f) for e, f in pendentes if e[0] not in falhas]
     if not pendentes:
-        return salvos, []
-    erros, novos = [], []
+        return salvos, erros
+    novos = []
     total = max(len(f) for _, f in pendentes)
     with st.status(f"Preparando {oque}: cruzando {total} {item}(s) novo(s), só desta vez",
                    expanded=True) as status:
         for (nome, fn, tempo, _), faltam in pendentes:
             if fn is dados.cruzar_gaia_ps1 and not dados.cds_no_ar():
                 erros.append(f"{nome}: servidor do CDS (XMatch) fora do ar")
+                falhas.add(nome)
                 st.write("Servidor do CDS fora do ar: pulo Gaia e Pan-STARRS.")
                 continue
             try:
@@ -68,6 +79,7 @@ def cruzar_e_guardar(df: pd.DataFrame, oque: str, item: str) -> tuple[pd.DataFra
                 st.write(f"✓ {nome}")
             except Exception as e:
                 erros.append(f"{nome}: {e}")
+                falhas.add(nome)
                 st.write(f"✗ {nome}: não respondeu ({e})")
         if novos:
             with sqlite3.connect(str(SQLITE_PATH)) as conn:
