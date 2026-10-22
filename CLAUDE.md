@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Pipeline pessoal de mineração de dados astronômicos. Busca candidatos a anãs marrons/estrelas frias próximas ao Sol via movimento próprio anômalo no catálogo **CatWISE2020** (acessado por TAP/IRSA), filtra por qualidade, descarta objetos já conhecidos (cross-match SIMBAD e listas de anãs do VizieR) e faz triagem final com LLM.
 
-O código fica na raiz do repositório. A especificação conceitual completa está em `projeto-rastro-especificacao-tecnica.md` (raiz).
+O código fica na raiz do repositório.
 
 ## Comandos
 

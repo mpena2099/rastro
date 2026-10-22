@@ -71,7 +71,8 @@ if "casos" not in st.session_state:
                                   .sample(n=n, random_state=semente)
                                   .sample(frac=1, random_state=semente).reset_index(drop=True))
     except Exception as e:
-        st.error(f"Não consegui montar os casos (o banco precisa das fases 2 a 4): {e}")
+        st.error(f"Não consegui montar os casos: {e}\n\nO treino precisa das fases 2 a 4 no banco "
+                 "e de `data/recall_conhecidas.pkl` (rode `python tools/recall_conhecidas.py`).")
         st.stop()
     st.session_state.pos, st.session_state.pontos, st.session_state.respostas = 0, 0.0, {}
 if st.session_state.casos.empty:

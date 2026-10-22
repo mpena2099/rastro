@@ -2,6 +2,8 @@
 
 [![testes](https://github.com/mpena2099/rastro/actions/workflows/testes.yml/badge.svg)](https://github.com/mpena2099/rastro/actions/workflows/testes.yml)
 
+[![testes](https://github.com/mpena2099/rastro/actions/workflows/testes.yml/badge.svg)](https://github.com/mpena2099/rastro/actions/workflows/testes.yml)
+
 Pipeline pessoal de mineração de dados astronômicos que caça **anãs marrons e estrelas frias próximas ao Sol** ainda não catalogadas, procurando por **movimento próprio anômalo** no catálogo público **CatWISE2020**.
 
 ![Ilustração artística de uma anã marrom](docs/img/eso1404c.jpg)
@@ -84,7 +86,7 @@ A lista é de *suspeitos*, não de descobertas. O caminho depois dela:
 
 - **Checklist.** Abaixo dos números, o app marca com ✅, ⚠️ ou ❌ cinco testes (movimento, AllWISE, Gaia, cor W1-W2 e óptico) e fecha com "Sugestão do pipeline". A sugestão é só um resumo dos números: ela só vale se os dois testes humanos passarem, um ponto nítido no infravermelho dentro da mira e, na animação, o ponto andando sempre na mesma direção.
 - **Animação.** A terceira imagem mostra o movimento: quadros do W2 do unWISE por época, montados pelo servidor do WiseView, com a mira no lugar e o ano escrito em cada quadro. Se o servidor falhar, a página mostra um aviso e continua funcionando.
-- **Modo treino.** A página `treino`, na barra lateral do app, sorteia casos já resolvidos, o mesmo número para cada resposta: anãs L/T/Y conhecidas que passariam pelos mesmos filtros da fila (uma anã fraca demais para ver nas imagens não entra), estrelas comuns de alto movimento do SIMBAD e candidatos rejeitados pela Fase 3. Os casos são cruzados com Gaia, Pan-STARRS e AllWISE uma vez, como a fila, então o checklist e a sugestão funcionam igual à revisão. O caso vem sem a resposta; depois do clique, o app mostra a resposta, a explicação e se você acertou. Dúvida vale meio ponto. Cada resposta fica gravada na tabela `treino_historico`, e o quadro "Seu histórico" mostra o acerto geral, o das últimas 20 respostas e o acerto separado por resposta certa: diferença grande entre eles indica viés, como confirmar quase tudo. No topo do treino aparece o nível (Aprendiz, Revisor ou Revisor confiável, pelas últimas 20 respostas), e a revisão mostra a trilha do trabalho: treino em dia, fila revisada, um confirmado com AllWISE consistente, segunda opinião pedida e descoberta publicada (as duas últimas você marca). Nada dá ponto por confirmar candidato.
+- **Modo treino.** A página `treino`, na barra lateral do app, sorteia casos já resolvidos, o mesmo número para cada resposta: anãs L/T/Y conhecidas que passariam pelos mesmos filtros da fila (uma anã fraca demais para ver nas imagens não entra), estrelas comuns de alto movimento do SIMBAD e candidatos rejeitados pela Fase 3. Os casos são cruzados com Gaia, Pan-STARRS e AllWISE uma vez, como a fila, então o checklist e a sugestão funcionam igual à revisão. O caso vem sem a resposta; depois do clique, o app mostra a resposta, a explicação e se você acertou. Dúvida vale meio ponto. Cada resposta fica gravada na tabela `treino_historico`, e o quadro "Seu histórico" mostra o acerto geral, o das últimas 20 respostas e o acerto separado por resposta certa: diferença grande entre eles indica viés, como confirmar quase tudo. No topo do treino aparece o nível (Aprendiz, Revisor ou Revisor confiável, pelas últimas 20 respostas), e a revisão mostra a trilha do trabalho: treino em dia, fila revisada, um confirmado com AllWISE consistente, segunda opinião pedida e descoberta publicada (as duas últimas você marca). Nada dá ponto por confirmar candidato. Antes do primeiro treino, rode uma vez `python tools/recall_conhecidas.py` (usa rede, ~8 min): ele grava `data/recall_conhecidas.pkl`, de onde saem as anãs do treino.
 
 **Casos de referência**
 
@@ -120,7 +122,7 @@ Em cada linha: infravermelho (unWISE NEO7) e óptico (Legacy Surveys). As três 
 
 ## Contexto científico
 
-O método não é novo. Kevin Luhman descobriu a **WISE 0855-0714** (a anã marrom mais fria conhecida, a ~2,3 parsecs, com movimento próprio de ~8"/ano) comparando imagens WISE de épocas diferentes. Voluntários de ciência cidadã, como os do projeto Backyard Worlds, também já acharam anãs ultrafrias vasculhando dados públicos.
+O método não é novo. Kevin Luhman descobriu a **WISE 0855-0714** (a anã marrom mais fria conhecida, a ~2,3 parsecs, com movimento próprio de ~8"/ano) comparando imagens WISE de épocas diferentes. Voluntários de ciência cidadã, como os do projeto Backyard Worlds, também já acharam anãs ultrafrias vasculhando dados públicos: um deles, Frank Kiwy, achou sozinho dezenas de sistemas binários.
 
 O que muda aqui é o catálogo. O CatWISE2020 (1,89 bilhão de fontes, combinando WISE e NEOWISE, 12 épocas em 8 anos) já traz o **movimento próprio calculado por fonte**, com precisão muito superior à de gerações anteriores. Não é preciso cruzar dois catálogos de épocas diferentes na mão: o ajuste já está feito, e melhor. Este projeto minera esse campo pronto.
 
@@ -303,7 +305,6 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
 ├── config.py                # toda a parametrizacao
 ├── requirements.txt
 ├── README.md
-├── projeto-rastro-especificacao-tecnica.md   # spec conceitual
 ├── src/
 │   ├── sanity_check.py      # Fase 1
 │   ├── fetch_field.py       # Fase 2
@@ -340,9 +341,21 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
     └── rastro.db            # resultados (gitignored)
 ```
 
-## Projeto conceitual
+## Dados e créditos
 
-A especificação técnica completa (motivação, fundamentação, armadilhas, referências) está em [`projeto-rastro-especificacao-tecnica.md`](projeto-rastro-especificacao-tecnica.md).
+- Catálogo de movimento próprio: CatWISE2020 (Marocco et al. 2021) e AllWISE, ambos do [IRSA](https://irsa.ipac.caltech.edu/) (NASA/IPAC).
+- Objetos conhecidos: [SIMBAD](https://simbad.cds.unistra.fr/), [VizieR](https://vizier.cds.unistra.fr/) e o serviço [XMatch](http://cdsxmatch.u-strasbg.fr/), do CDS (Estrasburgo).
+- Contrapartes ópticas: Gaia DR3 (ESA/DPAC) e Pan-STARRS DR1, via VizieR.
+- Imagens: unWISE (NASA/WISE) e DR10 do [Legacy Surveys](https://www.legacysurvey.org/) (DESI); animação por época do [WiseView](http://byw.tools/wiseview) (Backyard Worlds).
+
+Este projeto usou o banco de dados SIMBAD e o serviço VizieR, operados no CDS, Estrasburgo, França.
+
+## Referências
+
+- Eisenhardt et al. (2020, ApJS 247, 69) e Marocco et al. (2021, ApJS 253, 8): definição do CatWISE2020, colunas, flags e precisão do movimento próprio.
+- Luhman (2014, ApJ 786, L18): descoberta da WISE 0855-0714 por comparação de épocas do WISE.
+- Backyard Worlds: Planet 9 (Zooniverse): ciência cidadã que já achou centenas de anãs frias em dados públicos do WISE; um voluntário, Frank Kiwy, achou sozinho dezenas de binárias ultrafrias.
+- Karpov et al. (2025, A&A 695, A195): lista de candidatas fotométricas que já continha o melhor candidato achado aqui (CWISE J100116.36+184013.6).
 
 ## Licença
 
