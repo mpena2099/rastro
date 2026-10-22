@@ -41,6 +41,13 @@ button[kind="primary"], button[kind="primary"] p { color: var(--rastro-fundo) !i
 }
 .rastro-tagline { margin-left: .7rem; font-size: .85rem; color: var(--rastro-suave); }
 .rastro-subtitulo { font-size: .95rem; color: var(--rastro-texto); }
+/* celular: marca e descricao em cima, progresso embaixo, cada um com a largura toda */
+@media (max-width: 640px) {
+    .rastro-cabecalho { flex-direction: column; align-items: stretch; gap: .8rem; }
+    .rastro-progresso { width: 100%; min-width: 0; text-align: left; }
+    .rastro-progresso-texto { text-align: left; }
+    .rastro-tagline { display: block; margin-left: 0; }
+}
 .rastro-trilha { display: flex; align-items: flex-start; background: var(--rastro-cartao);
   border: 1px solid var(--rastro-borda); border-radius: .8rem; padding: .55rem .4rem;
   margin-bottom: .8rem; }
