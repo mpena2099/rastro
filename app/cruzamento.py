@@ -5,6 +5,8 @@ sugestao saia sempre Duvida.
 """
 
 import sqlite3
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
 import streamlit as st
@@ -15,6 +17,22 @@ from config import SQLITE_PATH
 
 ETAPAS = (("Gaia DR3 e Pan-STARRS", dados.cruzar_gaia_ps1, "~10 s", "gaia_detectada"),
           ("AllWISE (teste de movimento)", dados.cruzar_allwise, "~1 min", "allwise_status"))
+
+
+def _com_relogio(fn, faltam: pd.DataFrame, nome: str, tempo: str) -> pd.DataFrame:
+    """fn(faltam) com um relogio na tela: sem ele, uma consulta lenta parece travada."""
+    marcador = st.empty()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        futuro = pool.submit(fn, faltam)
+        inicio = time.time()
+        while not futuro.done():
+            seg = int(time.time() - inicio)
+            marcador.write(f"⏳ {nome}: consultando o servidor há {seg // 60} min {seg % 60:02d} s "
+                           f"(costuma levar {tempo}). Pode deixar a aba em segundo plano, "
+                           "mas não recarregue a página.")
+            time.sleep(1)
+        marcador.empty()
+        return futuro.result()
 
 
 def cruzar_e_guardar(df: pd.DataFrame, oque: str, item: str) -> tuple[pd.DataFrame, list[str]]:
@@ -41,15 +59,16 @@ def cruzar_e_guardar(df: pd.DataFrame, oque: str, item: str) -> tuple[pd.DataFra
     with st.status(f"Preparando {oque}: cruzando {total} {item}(s) novo(s), só desta vez",
                    expanded=True) as status:
         for (nome, fn, tempo, _), faltam in pendentes:
-            st.write(f"{nome} ({tempo})")
             if fn is dados.cruzar_gaia_ps1 and not dados.cds_no_ar():
                 erros.append(f"{nome}: servidor do CDS (XMatch) fora do ar")
                 st.write("Servidor do CDS fora do ar: pulo Gaia e Pan-STARRS.")
                 continue
             try:
-                novos.append(fn(faltam))
+                novos.append(_com_relogio(fn, faltam, nome, tempo))
+                st.write(f"✓ {nome}")
             except Exception as e:
                 erros.append(f"{nome}: {e}")
+                st.write(f"✗ {nome}: não respondeu ({e})")
         if novos:
             with sqlite3.connect(str(SQLITE_PATH)) as conn:
                 for n in novos:
