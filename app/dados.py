@@ -64,9 +64,14 @@ def apagar_revisao(conn: sqlite3.Connection, source_id: str) -> None:
 def ler_cruzamentos(conn: sqlite3.Connection) -> pd.DataFrame:
     """Gaia/Pan-STARRS/AllWISE ja cruzados (tabela cruzamentos_app), ou vazio."""
     try:
-        return pd.read_sql("SELECT * FROM cruzamentos_app", conn)
+        cruz = pd.read_sql("SELECT * FROM cruzamentos_app", conn)
     except Exception:
         return pd.DataFrame(columns=["source_id"])
+    # o SQLite devolve esses sinalizadores como texto ("0", "1.0") quando a coluna tem vazios
+    for coluna in ("gaia_detectada", "ps1_detectada"):
+        if coluna in cruz:
+            cruz[coluna] = pd.to_numeric(cruz[coluna], errors="coerce").astype("boolean")
+    return cruz
 
 
 def salvar_cruzamentos(conn: sqlite3.Connection, novos: pd.DataFrame) -> None:
