@@ -179,11 +179,18 @@ O pipeline é um lote longo, sem interação, e o terminal serve bem. A revisão
 A partir da raiz do repositório:
 
 ```bash
-python3 -m venv venv && source venv/bin/activate   # se ainda nao existir
+python3 -m venv venv && source venv/bin/activate   # Linux e macOS, se ainda nao existir
 pip install -r requirements.txt
 python -u pipeline.py       # roda as fases 1 a 5 em sequencia
 python -u pipeline.py --proximo  # escolhe sozinho o próximo bloco do céu e roda tudo
 ```
+
+No Windows (PowerShell), crie e ative o ambiente assim; o resto dos comandos é igual:
+
+```powershell
+py -m venv venv; venv\Scripts\Activate.ps1
+```
+
 
 `-u` faz o Python escrever cada `print` na hora. No terminal isso já acontece, mas com a saída redirecionada (`> log.txt`, `| tee log.txt`, `nohup`) o Python junta tudo em blocos e o log fica parado por minutos, parecendo travado, nas fases longas.
 
@@ -256,15 +263,21 @@ Esta é a única fase que precisa de chave. É **provider-agnóstico**: fala o f
 3. Guarde a chave numa variável de ambiente, que é de onde o projeto a lê. Para valer em todo terminal novo:
 
    ```bash
+   # Linux (bash); no macOS troque ~/.bashrc por ~/.zshrc
    echo 'export GROQ_API_KEY="gsk_cole_a_sua_chave_aqui"' >> ~/.bashrc
    source ~/.bashrc
    ```
 
+   ```powershell
+   # Windows: grava para os próximos terminais; feche e abra o terminal depois
+   setx GROQ_API_KEY "gsk_cole_a_sua_chave_aqui"
+   ```
+
    Não coloque a chave em `config.py` nem em nenhum arquivo do repositório: ela iria parar no git.
-4. Teste a chave. Se aparecer uma lista de modelos, está certa; `Invalid API Key` quer dizer chave errada ou incompleta:
+4. Teste a chave (o mesmo comando nos três sistemas, com o ambiente ativado). Se aparecer uma lista de modelos, está certa; `Invalid API Key` quer dizer chave errada ou incompleta:
 
    ```bash
-   curl -s https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY" | head -c 300
+   python -c "import os, httpx; print(httpx.get('https://api.groq.com/openai/v1/models', headers={'Authorization': 'Bearer ' + os.environ['GROQ_API_KEY']}).text[:300])"
    ```
 
 5. Rode só a Fase 5 (as fases 1 a 4 precisam já ter rodado):
@@ -277,7 +290,7 @@ Esta é a única fase que precisa de chave. É **provider-agnóstico**: fala o f
 
 **Outro provedor.** Mude em `config.py` as linhas `LLM_BASE_URL`, `LLM_MODEL` e `LLM_API_KEY_ENV` (há exemplos prontos comentados para Gemini, OpenRouter, Zhipu e Ollama) e exporte a chave com o nome que você pôs em `LLM_API_KEY_ENV`. Com Ollama local, use `LLM_API_KEY_ENV = None`: não há chave.
 
-A chave é lida por `load_api_key()` da variável em `LLM_API_KEY_ENV`. Se a variável não existir, há um segundo lugar, conveniente para quem usa o OpenCode: o arquivo `~/.local/share/opencode/auth.json` (campo `<provider>.key`). O projeto não lê arquivo `.env`.
+A chave é lida por `load_api_key()` da variável em `LLM_API_KEY_ENV`. Se a variável não existir, há um segundo lugar, conveniente para quem usa o OpenCode: o arquivo `~/.local/share/opencode/auth.json` (campo `<provider>.key`), caminho do Linux e do macOS. No Windows, use a variável. O projeto não lê arquivo `.env`.
 
 A triagem pode usar **saída estruturada** (`response_format` json_schema, `LLM_STRUCTURED=True`), mas o default é o modo texto: o `gpt-oss-20b` no Groq falha o JSON em boa parte das chamadas. Se o modelo rejeitar o formato, cai no modo texto e lê o veredito da resposta. Resposta vazia vira `erro`, nunca um score. Regra do score: **`alta` só sai de um veredito explícito do modelo**; heurística por palavra-chave só rebaixa, nunca promove, pra não gerar falso positivo.
 

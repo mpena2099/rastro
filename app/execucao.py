@@ -7,11 +7,12 @@ log a cada poucos segundos.
 
 import os
 import re
-import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+import psutil
 
 ROOT = Path(__file__).resolve().parent.parent
 LOG = ROOT / "data" / "pipeline.log"
@@ -21,14 +22,18 @@ CANCELADA = "Busca cancelada pelo app."
 
 
 def _processos() -> list[int]:
-    """PIDs de pipeline.py rodando a partir deste projeto (do app ou do terminal)."""
+    """PIDs de pipeline.py rodando a partir deste projeto (do app ou do terminal).
+
+    psutil em vez de /proc: funciona tambem no macOS e no Windows.
+    """
     achados = []
-    for d in Path("/proc").glob("[0-9]*"):
+    for proc in psutil.process_iter(["cmdline", "cwd"]):
         try:
-            cmd = (d / "cmdline").read_bytes().split(b"\0")
-            if any(p.endswith(b"pipeline.py") for p in cmd) and Path(os.readlink(d / "cwd")) == ROOT:
-                achados.append(int(d.name))
-        except (OSError, ValueError):
+            cmd = proc.info["cmdline"] or []
+            cwd = proc.info["cwd"]
+            if any(p.endswith("pipeline.py") for p in cmd) and cwd and Path(cwd) == ROOT:
+                achados.append(proc.pid)
+        except (psutil.Error, OSError, ValueError):
             continue
     return achados
 
@@ -37,12 +42,19 @@ def rodando() -> bool:
     return bool(_processos())
 
 
+def _sessao_propria() -> dict:
+    """Processo desligado do Streamlit: parar o app nao interrompe a busca."""
+    if sys.platform == "win32":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
 def iniciar() -> None:
     LOG.parent.mkdir(parents=True, exist_ok=True)
     with open(LOG, "w", encoding="utf-8") as saida:
         subprocess.Popen([sys.executable, "-u", "pipeline.py", "--proximo"], cwd=ROOT,
                          stdout=saida, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                         start_new_session=True)
+                         env={**os.environ, "PYTHONIOENCODING": "utf-8"}, **_sessao_propria())
 
 
 def cancelar() -> None:
@@ -50,12 +62,12 @@ def cancelar() -> None:
     busca ele e refeito do inicio, e as decisoes da revisao nao sao tocadas."""
     for pid in _processos():
         try:
-            # iniciada pelo app: sessao propria, o grupo leva junto os downloads paralelos
-            if os.getpgid(pid) == pid:
-                os.killpg(pid, signal.SIGTERM)
-            else:
-                os.kill(pid, signal.SIGTERM)
-        except ProcessLookupError:
+            # leva junto os downloads paralelos que a busca abriu
+            proc = psutil.Process(pid)
+            for filho in proc.children(recursive=True):
+                filho.terminate()
+            proc.terminate()
+        except psutil.Error:
             continue
     with open(LOG, "a", encoding="utf-8") as saida:
         saida.write(f"\n{CANCELADA}\n")

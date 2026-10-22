@@ -7,3 +7,4 @@ ipykernel==7.3.0
 httpx==0.28.1
 streamlit==1.65.0
 pillow==12.3.0
+psutil==7.0.0

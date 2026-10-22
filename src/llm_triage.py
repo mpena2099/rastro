@@ -59,7 +59,7 @@ def load_api_key() -> str:
         return key
 
     if LLM_API_KEY_FILE.exists():
-        with open(LLM_API_KEY_FILE) as f:
+        with open(LLM_API_KEY_FILE, encoding="utf-8") as f:
             data = json.load(f)
         key = data.get(LLM_API_KEY_FILE_PROVIDER, {}).get("key")
         if key:
