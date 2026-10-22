@@ -208,7 +208,9 @@ def test_casos_treino():
     # 2 por tipo conhecido + 2 estrelas + 1 rejeitado (o de PM 0.05 e cortado)
     assert len(casos) == 9
     assert casos["resposta"].value_counts().to_dict() == {"confirmado": 6, "descartado": 3}
-    assert "Anã L5 conhecida: Ana 1" in casos["explicacao"].tolist()
+    assert casos["explicacao"].str.startswith("Anã L5 conhecida: Ana 1").any()
+    # metade dos confirmados vem da metade de menor PM/sigma de cada tipo
+    assert casos["explicacao"].str.contains("caso difícil").sum() == 3
     assert not casos["explicacao"].str.contains("Ana 7").any()
     assert casos.equals(dados.casos_treino(conhecidas, estrelas, rejeitados, n_por_classe=2))
     assert not casos.equals(dados.casos_treino(conhecidas, estrelas, rejeitados, n_por_classe=3))

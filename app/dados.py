@@ -456,9 +456,19 @@ def casos_treino(conhecidas: pd.DataFrame, estrelas: pd.DataFrame, rejeitados: p
     # do erro e verdade, mas nao da para confirmar pelas imagens
     conhecidas = conhecidas[passaria_na_fila(conhecidas).values]
     for _, grupo in preparar(conhecidas).groupby("tipo"):
-        for x in grupo.sample(min(n_por_classe, len(grupo)), random_state=semente).itertuples():
-            linhas.append({**linha(x), "resposta": "confirmado",
-                           "explicacao": f"Anã {x.sp_type} conhecida: {x.main_id}"})
+        # metade dos casos vem da metade de menor PM/sigma do tipo: as anas brilhantes e rapidas
+        # sao faceis, e a fila real e feita de casos perto do corte
+        grupo = grupo.sort_values("pm_signif")
+        fracos, fortes = grupo.iloc[:len(grupo) // 2], grupo.iloc[len(grupo) // 2:]
+        n_fracos = min(len(fracos), (min(n_por_classe, len(grupo)) + 1) // 2)
+        n_fortes = min(len(fortes), min(n_por_classe, len(grupo)) - n_fracos)
+        escolhidos = [(fracos.sample(n_fracos, random_state=semente), True),
+                      (fortes.sample(n_fortes, random_state=semente), False)]
+        for parte, dificil in escolhidos:
+            for x in parte.itertuples():
+                nota = " (caso difícil: movimento perto do limite)" if dificil else ""
+                linhas.append({**linha(x), "resposta": "confirmado",
+                               "explicacao": f"Anã {x.sp_type} conhecida: {x.main_id}{nota}"})
     e = preparar(estrelas)
     if "otype" in e:
         # ana marrom ou estrela ultrafria no SIMBAD nao e descarte claro neste projeto
