@@ -13,39 +13,55 @@ from app import dados
 from config import SQLITE_PATH
 
 
-def cruzar_e_guardar(df: pd.DataFrame, oque: str, item: str) -> tuple[pd.DataFrame, list[str]]:
-    """Cruzamentos guardados no banco; so os candidatos novos vao ao Gaia/PS1/AllWISE.
+ETAPAS = (("Gaia DR3 e Pan-STARRS", dados.cruzar_gaia_ps1, "~10 s", "gaia_detectada"),
+          ("AllWISE (teste de movimento)", dados.cruzar_allwise, "~1 min", "allwise_status"))
 
-    Leva ~1 min por centena. Cruzamento que falha nao e gravado e volta na proxima abertura.
+
+def cruzar_e_guardar(df: pd.DataFrame, oque: str, item: str) -> tuple[pd.DataFrame, list[str]]:
+    """Cruzamentos guardados no banco; cada etapa cruza so quem ainda nao a tem.
+
+    Leva ~1 min por centena. Etapa que falha nao e gravada e volta na proxima abertura;
+    a outra etapa e gravada mesmo assim.
     """
     with sqlite3.connect(str(SQLITE_PATH)) as conn:
         salvos = dados.ler_cruzamentos(conn)
-    faltam = df[~df["source_id"].isin(salvos["source_id"])]
-    if faltam.empty:
+    por_id = salvos.set_index("source_id")
+
+    def sem(coluna: str) -> pd.DataFrame:
+        if coluna not in por_id:
+            return df
+        return df[df["source_id"].map(por_id[coluna]).isna()]
+
+    pendentes = [(e, sem(e[3])) for e in ETAPAS]
+    pendentes = [(e, f) for e, f in pendentes if not f.empty]
+    if not pendentes:
         return salvos, []
-    novos, erros = faltam[["source_id"]].copy(), []
-    with st.status(f"Preparando {oque}: cruzando {len(faltam)} {item}(s) novo(s), só desta vez",
+    erros, novos = [], []
+    total = max(len(f) for _, f in pendentes)
+    with st.status(f"Preparando {oque}: cruzando {total} {item}(s) novo(s), só desta vez",
                    expanded=True) as status:
-        for nome, fn, tempo in (("Gaia DR3 e Pan-STARRS", dados.cruzar_gaia_ps1, "~10 s"),
-                                ("AllWISE (teste de movimento)", dados.cruzar_allwise, "~1 min")):
+        for (nome, fn, tempo, _), faltam in pendentes:
             st.write(f"{nome} ({tempo})")
             if fn is dados.cruzar_gaia_ps1 and not dados.cds_no_ar():
                 erros.append(f"{nome}: servidor do CDS (XMatch) fora do ar")
                 st.write("Servidor do CDS fora do ar: pulo Gaia e Pan-STARRS.")
                 continue
             try:
-                novos = novos.merge(fn(faltam), on="source_id", how="left")
+                novos.append(fn(faltam))
             except Exception as e:
                 erros.append(f"{nome}: {e}")
+        if novos:
+            with sqlite3.connect(str(SQLITE_PATH)) as conn:
+                for n in novos:
+                    dados.salvar_cruzamentos(conn, n)
+                salvos = dados.ler_cruzamentos(conn)
         if erros:
-            status.update(label="Cruzamento incompleto: tento de novo na próxima abertura",
+            status.update(label="Cruzamento incompleto: a etapa que falhou volta na próxima abertura",
                           state="error", expanded=False)
-            return pd.concat([salvos, novos], ignore_index=True), erros
-        with sqlite3.connect(str(SQLITE_PATH)) as conn:
-            dados.salvar_cruzamentos(conn, novos)
-        status.update(label=f"Pronto: {len(faltam)} {item}(s) cruzado(s) e guardado(s)",
-                      state="complete", expanded=False)
-    return pd.concat([salvos, novos], ignore_index=True), []
+        else:
+            status.update(label=f"Pronto: {total} {item}(s) cruzado(s) e guardado(s)",
+                          state="complete", expanded=False)
+    return salvos, erros
 
 
 def completar(df: pd.DataFrame, oque: str, item: str) -> tuple[pd.DataFrame, list[str]]:

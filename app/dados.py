@@ -70,10 +70,10 @@ def ler_cruzamentos(conn: sqlite3.Connection) -> pd.DataFrame:
 
 
 def salvar_cruzamentos(conn: sqlite3.Connection, novos: pd.DataFrame) -> None:
-    """Acrescenta os cruzamentos novos; o app so cruza quem ainda nao esta na tabela."""
-    tabela = pd.concat([ler_cruzamentos(conn), novos], ignore_index=True)
-    tabela.drop_duplicates("source_id", keep="last").to_sql(
-        "cruzamentos_app", conn, if_exists="replace", index=False)
+    """Junta os cruzamentos novos aos guardados, coluna a coluna: valor novo vence, vazio mantem o antigo."""
+    antigos = ler_cruzamentos(conn).set_index("source_id")
+    tabela = novos.drop_duplicates("source_id", keep="last").set_index("source_id").combine_first(antigos)
+    tabela.reset_index().to_sql("cruzamentos_app", conn, if_exists="replace", index=False)
 
 
 def url_recorte(ra: float, dec: float, camada: str, tamanho_arcsec: float = 60.0) -> str:
