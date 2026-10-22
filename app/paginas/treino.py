@@ -1,5 +1,6 @@
 """Modo treino: casos com resposta, pra aprender a olhar as imagens."""
 
+import random
 import sqlite3
 import sys
 from pathlib import Path
@@ -61,12 +62,14 @@ def recomecar():
 
 if "casos" not in st.session_state:
     try:
-        casos = guia.casos_de_treino()
+        # semente nova a cada sessao: refazer o treino traz casos diferentes
+        semente = random.randrange(2**31)
+        casos = guia.casos_de_treino(semente)
         # mesmo numero de casos por resposta: senao responder sempre a classe maior pontua bem
         n = int(casos["resposta"].value_counts().min())
         st.session_state.casos = (casos.groupby("resposta", group_keys=False)
-                                  .sample(n=n, random_state=42)
-                                  .sample(frac=1, random_state=42).reset_index(drop=True))
+                                  .sample(n=n, random_state=semente)
+                                  .sample(frac=1, random_state=semente).reset_index(drop=True))
     except Exception as e:
         st.error(f"Não consegui montar os casos (o banco precisa das fases 2 a 4): {e}")
         st.stop()

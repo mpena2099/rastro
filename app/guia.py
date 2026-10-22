@@ -67,7 +67,7 @@ def _tipos_simbad(nomes: list[str]) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
-def casos_de_treino() -> pd.DataFrame:
+def casos_de_treino(semente: int = 42) -> pd.DataFrame:
     """Anãs conhecidas, estrelas comuns do SIMBAD e rejeitados da Fase 3, com resposta."""
     with sqlite3.connect(str(SQLITE_PATH)) as conn:
         # so quem tem nome no SIMBAD: catalogo_match sem SIMBAD pode ser ana ja publicada
@@ -80,7 +80,7 @@ def casos_de_treino() -> pd.DataFrame:
     estrelas = estrelas.merge(_tipos_simbad(estrelas["simbad_match_id"].tolist()),
                               on="simbad_match_id", how="left")
     return dados.casos_treino(pd.read_pickle(ROOT / "data" / "recall_conhecidas.pkl"),
-                              estrelas, rejeitados)
+                              estrelas, rejeitados, semente=semente)
 
 
 def exemplos(casos: pd.DataFrame, excluir: tuple[float, float] | None = None) -> dict:
