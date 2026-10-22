@@ -29,6 +29,10 @@ def cruzar_e_guardar(df: pd.DataFrame, oque: str, item: str) -> tuple[pd.DataFra
         for nome, fn, tempo in (("Gaia DR3 e Pan-STARRS", dados.cruzar_gaia_ps1, "~10 s"),
                                 ("AllWISE (teste de movimento)", dados.cruzar_allwise, "~1 min")):
             st.write(f"{nome} ({tempo})")
+            if fn is dados.cruzar_gaia_ps1 and not dados.cds_no_ar():
+                erros.append(f"{nome}: servidor do CDS (XMatch) fora do ar")
+                st.write("Servidor do CDS fora do ar: pulo Gaia e Pan-STARRS.")
+                continue
             try:
                 novos = novos.merge(fn(faltam), on="source_id", how="left")
             except Exception as e:

@@ -81,8 +81,9 @@ if not st.session_state.get("casos_cruzados"):
     st.session_state.casos_cruzados = True
     st.session_state.erros_cruzamento = _erros
 if st.session_state.get("erros_cruzamento"):
-    st.warning("Algum catálogo não respondeu (Gaia, Pan-STARRS ou AllWISE): o checklist marca "
-               "atenção onde falta o dado. Na próxima sessão do treino ele tenta de novo.")
+    st.warning("Algum catálogo não respondeu (Gaia e Pan-STARRS vêm do servidor do CDS, que às "
+               "vezes cai): o checklist marca atenção onde falta o dado. Na próxima sessão do "
+               "treino ele tenta de novo. Detalhe: " + "; ".join(st.session_state.erros_cruzamento))
 
 pos = max(0, min(st.session_state.pos, len(st.session_state.casos) - 1))
 c = st.session_state.casos.iloc[pos]

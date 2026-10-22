@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-from config import REDE_PRAZO_S
+from config import CDS_PRAZO_S, REDE_PRAZO_S
 from src.util import com_prazo
 
 DECISOES = ("confirmado", "duvida", "descartado")
@@ -136,6 +136,16 @@ def resumo_vizier(achados: pd.DataFrame) -> str:
                      for a in anas.itertuples())
 
 
+def cds_no_ar() -> bool:
+    """False se o XMatch do CDS nao responde em 8 s (qualquer resposta HTTP conta como no ar)."""
+    from astroquery.xmatch import XMatch
+    try:
+        httpx.get(XMatch.URL, timeout=8)
+        return True
+    except httpx.HTTPError:
+        return False
+
+
 def cruzar_gaia_ps1(df: pd.DataFrame) -> pd.DataFrame:
     """Marca candidatos com contraparte no Gaia DR3 (3") e no Pan-STARRS (2").
 
@@ -150,7 +160,7 @@ def cruzar_gaia_ps1(df: pd.DataFrame) -> pd.DataFrame:
     def xmatch(ra, dec, cat, raio_arcsec):
         t = Table({"source_id": df["source_id"].values, "ra": ra, "dec": dec})
         r = com_prazo(lambda: XMatch.query(cat1=t, cat2=cat, max_distance=raio_arcsec * u.arcsec,
-                                           colRA1="ra", colDec1="dec"), REDE_PRAZO_S).to_pandas()
+                                           colRA1="ra", colDec1="dec"), CDS_PRAZO_S).to_pandas()
         return r.sort_values("angDist").drop_duplicates("source_id")
 
     out = df[["source_id"]].copy()

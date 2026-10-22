@@ -11,6 +11,8 @@ CATWISE_TABLE = "catwise_2020"
 # prazo de relogio de uma chamada de rede (util.com_prazo); um ladrilho de 1 grau no IRSA
 # leva alguns minutos, por isso folgado
 REDE_PRAZO_S = 600
+# o XMatch do CDS responde em segundos quando esta no ar; fora do ar nao responde nunca
+CDS_PRAZO_S = 90
 CATWISE_COLUMNS = [
     "source_id", "ra", "dec",
     "w1mpro", "w2mpro", "w1snr", "w2snr",
