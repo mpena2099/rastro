@@ -8,6 +8,10 @@ Pipeline pessoal de mineração de dados astronômicos que caça **anãs marrons
 
 *Ilustração artística de uma anã marrom (Luhman 16B), parte do terceiro sistema mais próximo do Sol. Crédito: ESO/I. Crossfield/N. Risinger (skysurvey.org), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).*
 
+![Tela de revisão do Rastro](docs/img/app_revisao.png)
+
+*A tela de revisão: para cada candidato, o recorte infravermelho, o óptico e a animação do movimento por época, com a pergunta de cada imagem e o progresso do trabalho no topo.*
+
 ## English summary
 
 Rastro is a personal data-mining pipeline that hunts for **uncatalogued brown dwarfs and cool stars near the Sun** through **high proper motion** in the public **CatWISE2020** catalogue (queried via IRSA TAP). Five automated phases share state through SQLite: a sanity check that recovers Luhman 16 and compares its measured proper motion, a tiled field download with server-side cuts, quality filtering (proper-motion significance, W2 SNR, contamination flags, pmcode), removal of known objects by cross-match with SIMBAD and 11 VizieR lists of ultracool dwarfs, and an LLM triage that only ranks, never decides. Two manual phases follow: a local Streamlit app for visual review (unWISE and Legacy Surveys cutouts, Gaia/Pan-STARRS counterparts, and a consistency test of the motion against AllWISE positions) and an HTML report for a second opinion. Recall against 949 known L/T/Y dwarfs from SIMBAD is about 76%. A 25 deg² scan (RA 148-153, Dec +18 to +23) left 237 candidates under review. The best one turned out to be already published as a photometric L5 candidate (Karpov et al. 2025), found independently; no discovery is claimed. Code and docs are in Portuguese; `config.py` holds every parameter. Run with `python pipeline.py`; offline tests with `python tests/test_units.py`.
@@ -148,6 +152,17 @@ O pipeline **não processa imagens**. A Fase 2 é uma consulta `SELECT ... WHERE
 | **Moonshot** | Um candidato genuinamente novo, validado por segunda opinião | Não, é o horizonte |
 
 O valor entregue está no pipeline funcionar corretamente, não no achado em si.
+
+## Achados
+
+O que o projeto encontrou até agora, inclusive o que não deu certo:
+
+| Achado | Estágio | O que ensinou |
+|---|---|---|
+| Teste de sanidade: a Luhman 16, anã marrom a 2 parsecs, é redescoberta com o movimento próprio certo | Feito a cada execução | A cadeia de dados (IRSA, SIMBAD) funciona de ponta a ponta |
+| Os cortes deixam passar 76% de 949 anãs L, T e Y já conhecidas | Medido | Dois cortes que pareciam óbvios derrubavam o recall e foram removidos |
+| Primeira varredura (RA 148° a 153°, Dec 18° a 23°): 22.065 fontes, 333 depois dos filtros, 237 candidatos novos | Em revisão visual | A maior parte do trabalho é descartar falsos positivos |
+| O melhor candidato, com o movimento confirmado pelo AllWISE, já estava publicado como CWISE J100116.36+184013.6, candidata L5 em Karpov et al. (2025) | Redescoberta independente | O método chega ao mesmo objeto que uma equipe profissional, mas há concorrência: antes de chamar algo de novo, consultar o VizieR inteiro |
 
 ## Como o pipeline funciona
 
