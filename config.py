@@ -5,6 +5,8 @@ ROOT = Path(__file__).parent
 # RASTRO_DB aponta para outra copia do banco: testes do app (AppTest) clicam em botoes que
 # gravam decisoes, e no banco real elas viravam revisao de verdade
 SQLITE_PATH = Path(os.environ.get("RASTRO_DB", ROOT / "data" / "rastro.db"))
+# demo online (app/demo.py): so o treino, com banco pequeno no repo e historico por sessao
+DEMO = os.environ.get("RASTRO_DEMO") == "1"
 
 CATWISE_TABLE = "catwise_2020"
 

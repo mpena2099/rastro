@@ -11,7 +11,7 @@ import pandas as pd
 import streamlit as st
 
 from app import dados, imagens
-from config import REDE_PRAZO_S, ROOT, SQLITE_PATH
+from config import DEMO, REDE_PRAZO_S, ROOT, SQLITE_PATH
 from src.util import com_prazo
 
 # Como ler as imagens, mostrado no topo do guia
@@ -77,6 +77,13 @@ def _tipos_simbad(nomes: list[str]) -> pd.DataFrame:
 @st.cache_data(show_spinner=False)
 def casos_de_treino(semente: int = 42) -> pd.DataFrame:
     """Anãs conhecidas, estrelas comuns do SIMBAD e rejeitados da Fase 3, com resposta."""
+    if DEMO:
+        # demo online: conjunto pronto (tools/gerar_demo.py), sem SIMBAD nem o pickle do recall
+        with sqlite3.connect(str(SQLITE_PATH)) as conn:
+            pool = pd.read_sql("SELECT * FROM casos_treino_demo", conn)
+        n = int(pool["resposta"].value_counts().min())
+        return (pool.groupby("resposta", group_keys=False).sample(n=min(n, 20), random_state=semente)
+                .sample(frac=1, random_state=semente).reset_index(drop=True))
     with sqlite3.connect(str(SQLITE_PATH)) as conn:
         # so quem tem nome no SIMBAD: catalogo_match sem SIMBAD pode ser ana ja publicada
         estrelas = pd.read_sql(

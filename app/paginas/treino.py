@@ -3,6 +3,7 @@
 import random
 import sqlite3
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -11,7 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from app import cruzamento, dados, estilo, imagens, guia
-from config import ROOT, SQLITE_PATH
+from config import DEMO, ROOT, SQLITE_PATH
 
 DESCRICAO = ("Casos de resposta conhecida (anãs já catalogadas, estrelas comuns e rejeitados pelo "
              "filtro de qualidade), para aprender a decidir antes da revisão de verdade. Você "
@@ -19,6 +20,16 @@ DESCRICAO = ("Casos de resposta conhecida (anãs já catalogadas, estrelas comun
              "candidatos; só o seu histórico de acertos é gravado.")
 ROTULOS = {"confirmado": "Confirmado", "duvida": "Dúvida", "descartado": "Descartado"}
 
+
+
+def conectar_historico() -> sqlite3.Connection:
+    """Banco das respostas. Na demo online, um arquivo por visitante: o banco do repo e
+    compartilhado entre todos e nao pode receber o historico de ninguem."""
+    if not DEMO:
+        return sqlite3.connect(str(SQLITE_PATH))
+    if "demo_historico" not in st.session_state:
+        st.session_state.demo_historico = tempfile.NamedTemporaryFile(suffix=".db", delete=False).name
+    return sqlite3.connect(st.session_state.demo_historico)
 
 def responder(i: int, decisao: str):
     if i in st.session_state.respostas:
@@ -28,13 +39,13 @@ def responder(i: int, decisao: str):
     certa = c["resposta"]
     pontos = 1.0 if decisao == certa else (0.5 if decisao == "duvida" else 0.0)
     st.session_state.pontos += pontos
-    with sqlite3.connect(str(SQLITE_PATH)) as conn:
+    with conectar_historico() as conn:
         dados.salvar_tentativa(conn, f"{c['ra']:.5f},{c['dec']:.5f}", decisao, certa, pontos)
 
 
 def mostrar_historico():
     """Aproveitamento de todas as sessoes, gravado no banco."""
-    with sqlite3.connect(str(SQLITE_PATH)) as conn:
+    with conectar_historico() as conn:
         r = dados.resumo_treino(dados.ler_tentativas(conn))
     if not r:
         return
@@ -96,7 +107,7 @@ respondidos = len(st.session_state.respostas)
 estilo.cabecalho("Treino", (st.session_state.pontos, respondidos),
                  "Acertos {atual} de {total}", DESCRICAO)
 # no treino so importa a primeira etapa da trilha: uma linha com o nivel e o que falta
-with sqlite3.connect(str(SQLITE_PATH)) as _conn:
+with conectar_historico() as _conn:
     _etapa = dados.marcos(_conn)[0]
     _nivel, _falta = dados.nivel_treino(dados.ler_tentativas(_conn))
 st.info(f"**Nível: {_nivel}.** "
