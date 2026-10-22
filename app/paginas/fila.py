@@ -60,6 +60,7 @@ def registrar(source_id: str, decisao: str, total: int, fica_na_fila: bool):
     else:
         # a lista encolheu: conta as decisoes para o numero da posicao seguir avancando
         st.session_state.decididos = st.session_state.get("decididos", 0) + 1
+    st.session_state.subir = True
 
 
 def limpar(source_id: str):
@@ -271,6 +272,9 @@ st.session_state.pos = max(0, min(total - 1, st.session_state.pos))
 r = fila.iloc[st.session_state.pos]
 sid = r["source_id"]
 
+estilo.ancora_caso()
+if st.session_state.pop("subir", False):
+    estilo.subir_ao_caso()
 nav = st.columns([1, 1, 6])
 nav[0].button("◀ Anterior", on_click=mover, args=(-1, total), disabled=st.session_state.pos == 0,
               width="stretch")

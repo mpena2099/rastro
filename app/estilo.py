@@ -171,3 +171,20 @@ def trilha_html(marcos: list[dict]) -> None:
         f'<div class="rastro-etapa-detalhe">{html.escape(str(m["detalhe"]))}</div></div>'
         for m in marcos)
     st.markdown(f'<div class="rastro-trilha">{etapas}</div>', unsafe_allow_html=True)
+
+
+def ancora_caso() -> None:
+    """Marca o ponto da tela para onde subir depois de uma decisao (logo acima das imagens)."""
+    st.markdown('<div id="topo-caso"></div>', unsafe_allow_html=True)
+
+
+def subir_ao_caso() -> None:
+    """Rola a pagina ate a ancora: depois de decidir, as imagens do proximo caso ficam a vista."""
+    import time
+    # o comentario com a hora faz o navegador executar o script a cada decisao
+    st.iframe(
+        f"<!-- {time.time()} --><script>const d = window.parent.document;"
+        "const a = d.getElementById('topo-caso');"
+        "if (a) { a.scrollIntoView({block: 'start'}); }"
+        "else { const m = d.querySelector('[data-testid=\"stMain\"]'); if (m) m.scrollTo(0, 0); }"
+        "</script>", height=1)
