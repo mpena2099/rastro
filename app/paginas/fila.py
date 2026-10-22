@@ -57,6 +57,9 @@ def registrar(source_id: str, decisao: str, total: int, fica_na_fila: bool):
     # pra posicao atual: avancar aqui pularia um candidato sem mostrar.
     if fica_na_fila:
         mover(+1, total)
+    else:
+        # a lista encolheu: conta as decisoes para o numero da posicao seguir avancando
+        st.session_state.decididos = st.session_state.get("decididos", 0) + 1
 
 
 def limpar(source_id: str):
@@ -245,6 +248,7 @@ assinatura = (busca, tuple(sel_decisao), gaia, ps1, allwise, sig_min, tuple(sel_
 if st.session_state.get("assinatura") != assinatura:
     st.session_state.assinatura = assinatura
     st.session_state.pos = 0
+    st.session_state.decididos = 0
     st.session_state.sel_aplicada = None
 st.session_state.setdefault("pos", 0)
 
@@ -272,7 +276,8 @@ nav[0].button("◀ Anterior", on_click=mover, args=(-1, total), disabled=st.sess
               width="stretch")
 nav[1].button("Próximo ▶", on_click=mover, args=(+1, total),
               disabled=st.session_state.pos >= total - 1, width="stretch")
-nav[2].markdown(f"**{st.session_state.pos + 1} de {total}** na fila  |  `{sid}`  |  "
+_ja = st.session_state.get("decididos", 0)
+nav[2].markdown(f"**{_ja + st.session_state.pos + 1} de {_ja + total}** na fila  |  `{sid}`  |  "
                 f"RA {r['ra']:.5f}, Dec {r['dec']:+.5f}")
 
 try:
