@@ -189,7 +189,7 @@ O uso tem duas partes, uma no terminal e outra no navegador:
 | Parte | Onde | Comando | Para quê |
 |---|---|---|---|
 | Fases 1 a 5 | Terminal | `python pipeline.py` | Baixar o céu, filtrar e montar a lista de candidatos. Leva um bom tempo e roda sozinho |
-| Fases 6 e 7 | Navegador | `streamlit run app/revisao.py` | Olhar as imagens, decidir e baixar o relatório dos confirmados |
+| Fases 6 e 7 | Navegador | `python iniciar.py` | Olhar as imagens, decidir e baixar o relatório dos confirmados |
 
 O pipeline é um lote longo, sem interação, e o terminal serve bem. A revisão precisa de imagens e de decisão humana, e por isso vive no navegador. O pipeline só precisa ser rodado de novo para varrer outra região ou refazer os cortes.
 
@@ -216,8 +216,10 @@ As fases 1 a 4 não precisam de chave. A Fase 5 precisa de uma chave grátis de 
 Revisar os candidatos (Fases 6 e 7), depois que a Fase 4 tiver rodado:
 
 ```bash
-streamlit run app/revisao.py
+python iniciar.py    # sobe o app e abre o navegador; usa o venv do projeto sozinho
 ```
+
+É o mesmo que `streamlit run app/revisao.py`, sem precisar ativar o venv. `python iniciar.py --demo` abre só o treino, como na demo online, e `--porta 8600` escolhe a porta.
 
 O app abre no navegador com a fila de candidatos pendentes e sem contraparte no Gaia, com os que o AllWISE mostra se movendo primeiro e depois do mais ao menos significativo. Na primeira abertura ele cruza a lista com Gaia, Pan-STARRS e AllWISE (alguns segundos). As páginas ficam em `app/paginas/` (`fila.py` para a revisão e `treino.py` para o treino), e o tema escuro e os componentes visuais vêm de `.streamlit/config.toml` e `app/estilo.py`. O guia "O que procurar em cada imagem" explica como ler as três imagens e o que decide. Quando a fila acabar, o botão "Buscar mais candidatas" (com confirmação, progresso e cancelamento) escolhe sozinho o próximo bloco do céu e roda o pipeline; o mesmo pelo terminal é `python -u pipeline.py --proximo`.
 
