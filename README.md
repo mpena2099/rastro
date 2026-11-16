@@ -1,8 +1,9 @@
 # Rastro
 
 [![testes](https://github.com/mpena2099/rastro/actions/workflows/testes.yml/badge.svg)](https://github.com/mpena2099/rastro/actions/workflows/testes.yml)
+[![Documentação](https://img.shields.io/badge/docs-online-2e7d32.svg)](https://mpena2099.github.io/rastro/)
 
-Pipeline pessoal de mineração de dados astronômicos que caça **anãs marrons e estrelas frias próximas ao Sol** ainda não catalogadas, procurando por **movimento próprio anômalo** no catálogo público **CatWISE2020**.
+Pipeline de mineração de dados astronômicos que caça **anãs marrons e estrelas frias próximas ao Sol** ainda não catalogadas, procurando por **movimento próprio anômalo** no catálogo público **CatWISE2020**.
 
 ![Ilustração artística de uma anã marrom](docs/img/eso1404c.jpg)
 
@@ -39,7 +40,7 @@ Rastro is a personal data-mining pipeline that hunts for **uncatalogued brown dw
 3. **Joga fora medidas duvidosas.** Defeitos do instrumento, pontos colados em vizinhos e movimentos pequenos demais pra distinguir de erro de medida.
 4. **Joga fora o que já é conhecido.** Compara com o SIMBAD, o grande cadastro de objetos astronômicos, e com listas publicadas de anãs frias que o SIMBAD ainda não absorveu.
 5. **Pede a nota de uma IA.** Uma IA lê os números de cada sobrevivente e dá uma nota de prioridade. Ela só ajuda a ordenar, nunca decide.
-6. **Olhar humano.** As imagens de cada suspeito são conferidas à mão, num app local (`streamlit run app/revisao.py`) que mostra os recortes, os números e a nota da IA, e guarda a sua decisão.
+6. **Olhar humano.** As imagens de cada suspeito são conferidas à mão, num app local (`python iniciar.py`) que mostra os recortes, os números e a nota da IA, e guarda a sua decisão.
 7. **Relatório pra um astrônomo.** Os candidatos que você confirmou saem numa página só, com imagens e números, prontos pra pedir uma segunda opinião. A opinião em si ainda está por fazer.
 
 ![Quantas fontes sobram em cada fase](docs/img/funil_fases.png)
@@ -90,7 +91,7 @@ A lista é de *suspeitos*, não de descobertas. O caminho depois dela:
 
 - **Checklist.** Abaixo dos números, o app marca com ✅, ⚠️ ou ❌ cinco testes (movimento, AllWISE, Gaia, cor W1-W2 e óptico) e fecha com "Sugestão do pipeline". A sugestão é só um resumo dos números: ela só vale se os dois testes humanos passarem, um ponto nítido no infravermelho dentro da mira e, na animação, o ponto andando sempre na mesma direção.
 - **Animação.** A terceira imagem mostra o movimento: quadros do W2 do unWISE por época, montados pelo servidor do WiseView, com a mira no lugar e o ano escrito em cada quadro. Se o servidor falhar, a página mostra um aviso e continua funcionando.
-- **Modo treino.** A página `treino`, na barra lateral do app, sorteia casos já resolvidos, o mesmo número para cada resposta: anãs L/T/Y conhecidas que passariam pelos mesmos filtros da fila (uma anã fraca demais para ver nas imagens não entra), estrelas comuns de alto movimento do SIMBAD e candidatos rejeitados pela Fase 3. Os casos são cruzados com Gaia, Pan-STARRS e AllWISE uma vez, como a fila, então o checklist e a sugestão funcionam igual à revisão. O caso vem sem a resposta; depois do clique, o app mostra a resposta, a explicação e se você acertou. Dúvida vale meio ponto. Cada resposta fica gravada na tabela `treino_historico`, e o quadro "Seu histórico" mostra o acerto geral, o das últimas 20 respostas e o acerto separado por resposta certa: diferença grande entre eles indica viés, como confirmar quase tudo. No topo do treino aparece o nível (Aprendiz, Revisor ou Revisor confiável, pelas últimas 20 respostas), e a revisão mostra a trilha do trabalho: treino em dia, fila revisada, um confirmado com AllWISE consistente, segunda opinião pedida e descoberta publicada (as duas últimas você marca). Nada dá ponto por confirmar candidato. Antes do primeiro treino, rode uma vez `python tools/recall_conhecidas.py` (usa rede, ~8 min): ele grava `data/recall_conhecidas.pkl`, de onde saem as anãs do treino.
+- **Modo treino.** A página `treino`, na barra lateral do app, sorteia casos já resolvidos, o mesmo número para cada resposta: anãs L/T/Y conhecidas que passariam pelos mesmos filtros da fila (uma anã fraca demais para ver nas imagens não entra), estrelas comuns de alto movimento do SIMBAD e candidatos rejeitados pela Fase 3. Os casos são cruzados com Gaia, Pan-STARRS e AllWISE uma vez, como a fila, então o checklist e a sugestão funcionam igual à revisão. O caso vem sem a resposta; depois do clique, o app mostra a resposta, a explicação e se você acertou. Dúvida vale meio ponto. Cada resposta fica gravada na tabela `treino_historico`, e o quadro "Seu histórico" mostra o acerto geral, o das últimas 20 respostas e o acerto separado por resposta certa: diferença grande entre eles indica viés, como confirmar quase tudo. No topo do treino aparece o nível (Aprendiz, Revisor ou Revisor confiável, pelas últimas 20 respostas), e a revisão mostra a trilha do trabalho: treino em dia, fila revisada, um confirmado com AllWISE consistente, segunda opinião pedida e descoberta publicada (as duas últimas você marca). Nada dá ponto por confirmar candidato. As anãs do treino saem de `data/recall_conhecidas.pkl`, gravado por `python tools/recall_conhecidas.py` (usa rede, ~8 min). Sem esse arquivo, o treino usa os casos prontos da demo online, que vêm com o projeto.
 
 **Casos de referência**
 
