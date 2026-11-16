@@ -30,7 +30,7 @@ py -m venv venv; venv\Scripts\Activate.ps1
 
 `-u` faz o Python escrever cada `print` na hora. No terminal isso já acontece, mas com a saída redirecionada (`> log.txt`, `| tee log.txt`, `nohup`) o Python junta tudo em blocos e o log fica parado por minutos, parecendo travado, nas fases longas.
 
-As fases 1 a 4 não precisam de chave. A Fase 5 precisa de uma chave grátis de LLM (veja [Triagem por LLM](#triagem-por-llm-fase-5)). Sem chave, ela falha e as tabelas das fases anteriores continuam no banco.
+As fases 1 a 4 não precisam de chave. A Fase 5 usa uma chave grátis de LLM (veja [Triagem por LLM](#triagem-por-llm-fase-5)). Sem chave, ela é pulada e os candidatos entram na fila como "sem triagem".
 
 Revisar os candidatos (Fases 6 e 7), depois que a Fase 4 tiver rodado:
 

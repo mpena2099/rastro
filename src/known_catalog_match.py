@@ -8,7 +8,7 @@ import astropy.units as u
 
 from config import (CATALOGOS_ANAS, CATALOGOS_ANAS_LOCAIS, CATALOGOS_RAIO_ARCSEC, ROOT, REDE_PRAZO_S, SQLITE_PATH,
                     SIMBAD_DELAY_S, SIMBAD_RADIUS_ARCSEC)
-from src.util import com_prazo
+from src.util import com_prazo, vizier_por_posicoes, xmatch_no_ar
 
 
 MJD_J2000 = 51544.5
@@ -73,16 +73,26 @@ def _cruzar_catalogos(df: pd.DataFrame) -> pd.DataFrame:
     ra2000, dec2000 = posicao_j2000(cand)
     posicoes = ((cand["ra"], cand["dec"]), (ra2000, dec2000))
     achados = {}
+    # o XMatch nao tem espelho: fora do ar, cada lista e consultada direto no VizieR (ou no
+    # espelho dele, ver src/util.py)
+    usar_xmatch = xmatch_no_ar()
+    if not usar_xmatch:
+        print("  XMatch do CDS fora do ar: consultando as listas direto no VizieR.")
     for tabela, nome in CATALOGOS_ANAS.items():
         ids = set()
         try:
             for ra, dec in posicoes:
-                t = Table({"source_id": cand["source_id"].values, "ra": ra.values,
-                           "dec": dec.values})
-                r = com_prazo(lambda: XMatch.query(
-                    cat1=t, cat2=f"vizier:{tabela}", max_distance=CATALOGOS_RAIO_ARCSEC * u.arcsec,
-                    colRA1="ra", colDec1="dec"), REDE_PRAZO_S)
-                ids |= {str(s) for s in r["source_id"]}
+                if usar_xmatch:
+                    t = Table({"source_id": cand["source_id"].values, "ra": ra.values,
+                               "dec": dec.values})
+                    r = com_prazo(lambda: XMatch.query(
+                        cat1=t, cat2=f"vizier:{tabela}",
+                        max_distance=CATALOGOS_RAIO_ARCSEC * u.arcsec,
+                        colRA1="ra", colDec1="dec"), REDE_PRAZO_S)
+                    ids |= {str(s) for s in r["source_id"]}
+                else:
+                    d = vizier_por_posicoes(ra.values, dec.values, tabela, CATALOGOS_RAIO_ARCSEC)
+                    ids |= {str(s) for s in cand["source_id"].values[d["idx"].unique()]}
         except Exception as e:
             # uma lista fora do ar nao derruba a fase; o SIMBAD ja filtrou o grosso
             print(f"  AVISO {nome}: {str(e)[:100]}")
@@ -112,6 +122,9 @@ def run():
     t["ra"] = ra2000.values
     t["dec"] = dec2000.values
 
+    if not xmatch_no_ar():
+        print("XMatch do CDS fora do ar: consulta individual ao SIMBAD (lenta).")
+        return _fallback_sequential(df)
     print("Enviando batch p/ CDS XMatch (SIMBAD)...")
     try:
         result = com_prazo(lambda: XMatch.query(

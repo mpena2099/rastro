@@ -383,6 +383,8 @@ with st.expander("Já foi publicado? (busca no VizieR inteiro)"):
             achados = vizier(float(r["ra"]), float(r["dec"]), float(r["pm_total"]))
             aguarde.empty()
             anas = achados[achados["lista_anas"]]
+            if achados.attrs.get("parcial"):
+                st.info(dados.AVISO_VIZIER_PARCIAL)
             if anas.empty:
                 st.success(dados.resumo_vizier(achados))
             else:

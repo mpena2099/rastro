@@ -88,6 +88,10 @@ CATALOGOS_ANAS = {
     "J/MNRAS/489/5301/desy3-lt": "Carnero Rosell+2019 (DES)",
 }
 CATALOGOS_RAIO_ARCSEC = 5
+# Com o VizieR de Estrasburgo fora, o espelho nao aguenta a busca em todos os catalogos
+# ("Ja foi publicado?" no app): consulta as listas acima e estes catalogos gerais.
+CATALOGOS_VIZIER_ESPELHO = ["II/365/catwise", "II/328/allwise", "I/355/gaiadr3", "II/349/ps1",
+                            "II/246/out"]
 # Listas que ainda nao estao no VizieR: CSV (nome, ra, dec) no git, na epoca do CatWISE,
 # cruzado localmente com o mesmo raio. Gerado por tools/baixar_schneider2026.py.
 CATALOGOS_ANAS_LOCAIS = {

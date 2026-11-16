@@ -10,7 +10,8 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-from config import CDS_PRAZO_S, REDE_PRAZO_S
+from config import CATALOGOS_ANAS, CATALOGOS_VIZIER_ESPELHO, CDS_PRAZO_S, REDE_PRAZO_S
+from src import util
 from src.util import com_prazo
 
 DECISOES = ("confirmado", "duvida", "descartado")
@@ -119,8 +120,12 @@ def buscar_vizier(ra: float, dec: float, pm_total: float) -> pd.DataFrame:
     from astroquery.vizier import Vizier
 
     raio = max(10.0, 16 * float(pm_total) + 5)
+    todos = util.VIZIER_ESPELHO is None
+    # o espelho do VizieR nao aguenta a busca em todos os catalogos: so as listas de anas da
+    # Fase 4 e os catalogos gerais de CATALOGOS_VIZIER_ESPELHO
+    catalogo = None if todos else [*CATALOGOS_ANAS, *CATALOGOS_VIZIER_ESPELHO]
     res = com_prazo(lambda: Vizier(columns=["_r"], row_limit=5, timeout=180).query_region(
-        SkyCoord(ra, dec, unit="deg"), radius=raio * u.arcsec), REDE_PRAZO_S)
+        SkyCoord(ra, dec, unit="deg"), radius=raio * u.arcsec, catalog=catalogo), REDE_PRAZO_S)
     linhas = []
     for nome in res.keys():
         t = res[nome]
@@ -129,26 +134,31 @@ def buscar_vizier(ra: float, dec: float, pm_total: float) -> pd.DataFrame:
                        "dist_arcsec": float(np.min(t["_r"])) if "_r" in t.colnames else np.nan,
                        "lista_anas": eh_lista_de_anas(descricao)})
     df = pd.DataFrame(linhas, columns=["catalogo", "descricao", "dist_arcsec", "lista_anas"])
-    return df.sort_values(["lista_anas", "dist_arcsec"], ascending=[False, True]).reset_index(drop=True)
+    df = df.sort_values(["lista_anas", "dist_arcsec"], ascending=[False, True]).reset_index(drop=True)
+    df.attrs["parcial"] = not todos
+    return df
+
+
+AVISO_VIZIER_PARCIAL = (f"VizieR de Estrasburgo fora do ar: a busca foi feita no espelho, só nas "
+                        f"{len(CATALOGOS_ANAS) + len(CATALOGOS_VIZIER_ESPELHO)} listas de anãs e "
+                        "catálogos gerais da lista, não no VizieR inteiro.")
 
 
 def resumo_vizier(achados: pd.DataFrame) -> str:
     """Texto curto: as listas de anas/movimento proprio encontradas, ou que nao ha nenhuma."""
     anas = achados[achados["lista_anas"]]
     if anas.empty:
+        if achados.attrs.get("parcial"):
+            return (f"nenhuma lista de anas ou de movimento proprio ({len(achados)} catalogos "
+                    "gerais; busca limitada, VizieR do CDS fora do ar)")
         return f"nenhuma lista de anas ou de movimento proprio ({len(achados)} catalogos gerais)"
     return "; ".join(f"{a.catalogo} ({a.descricao[:60]}) a {a.dist_arcsec:.1f}\""
                      for a in anas.itertuples())
 
 
 def cds_no_ar() -> bool:
-    """False se o XMatch do CDS nao responde em 8 s (qualquer resposta HTTP conta como no ar)."""
-    from astroquery.xmatch import XMatch
-    try:
-        httpx.get(XMatch.URL, timeout=8)
-        return True
-    except httpx.HTTPError:
-        return False
+    """False se nem o XMatch do CDS nem o VizieR (do CDS ou o espelho) respondem em 8 s."""
+    return util.xmatch_no_ar() or util.vizier_no_ar()
 
 
 def cruzar_gaia_ps1(df: pd.DataFrame) -> pd.DataFrame:
@@ -162,7 +172,16 @@ def cruzar_gaia_ps1(df: pd.DataFrame) -> pd.DataFrame:
     from astropy.table import Table
     from astroquery.xmatch import XMatch
 
+    usar_xmatch = util.xmatch_no_ar()
+
     def xmatch(ra, dec, cat, raio_arcsec):
+        if not usar_xmatch:  # XMatch fora: direto no VizieR (ou no espelho dele)
+            colunas = ["Gmag", "Plx"] if "gaia" in cat else ["rmag", "zmag", "ymag"]
+            d = util.vizier_por_posicoes(ra, dec, cat.removeprefix("vizier:"), raio_arcsec,
+                                         colunas, prazo_s=CDS_PRAZO_S,
+                                         todas_colunas="ps1" in cat)
+            d["source_id"] = df["source_id"].values[d["idx"].astype(int)] if len(d) else []
+            return d.sort_values("dist_arcsec").drop_duplicates("source_id")
         t = Table({"source_id": df["source_id"].values, "ra": ra, "dec": dec})
         r = com_prazo(lambda: XMatch.query(cat1=t, cat2=cat, max_distance=raio_arcsec * u.arcsec,
                                            colRA1="ra", colDec1="dec"), CDS_PRAZO_S).to_pandas()
