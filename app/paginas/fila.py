@@ -9,7 +9,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import pandas as pd
 import streamlit as st
 
-from app import cruzamento, dados, estilo, execucao, imagens, guia
+from datetime import date
+
+from app import cruzamento, dados, envio, estilo, execucao, imagens, guia
 from config import ROOT, SQLITE_PATH
 from src import relatorio
 
@@ -38,6 +40,50 @@ def vizier(ra: float, dec: float, pm_total: float) -> pd.DataFrame:
 
 def conectar() -> sqlite3.Connection:
     return sqlite3.connect(str(SQLITE_PATH))
+
+
+def marcar_enviado(source_id: str):
+    with conectar() as conn:
+        envio.marcar_enviado(conn, source_id, st.session_state.get(f"destino_{source_id}", ""))
+    st.toast(f"{source_id} marcado como enviado. Ele aparece no filtro Envio > Enviados.")
+
+
+def registrar_resposta(source_id: str):
+    with conectar() as conn:
+        envio.registrar_resposta(
+            conn, source_id, st.session_state.get(f"aceito_{source_id}") == "Aceito",
+            st.session_state.get(f"resposta_{source_id}", ""),
+            st.session_state.get(f"ident_{source_id}", ""))
+    st.toast(f"Resposta de {source_id} registrada.")
+
+
+def desfazer_envio(source_id: str):
+    with conectar() as conn:
+        envio.desfazer_envio(conn, source_id)
+
+
+def checar_publicados(todos: pd.DataFrame, envios: pd.DataFrame):
+    """Uma vez por sessao e por dia: o enviado sem resposta ja aparece no SIMBAD como ana?"""
+    if st.session_state.get("checou_publicados"):
+        return
+    st.session_state.checou_publicados = True
+    hoje = date.today().isoformat()
+    abertos = envios[envios["respondido_em"].isna() & (envios["checado_em"].fillna("") != hoje)]
+    for e in abertos.itertuples():
+        linha = todos[todos["source_id"] == e.source_id]
+        if linha.empty:
+            continue
+        c = linha.iloc[0]
+        try:
+            achado = envio.ja_no_simbad(float(c["ra"]), float(c["dec"]), float(c["pm_total"]),
+                                        c.get("meanobsmjd"))
+        except Exception:
+            continue  # SIMBAD fora: tenta na proxima sessao
+        with conectar() as conn:
+            envio.marcar_checado(conn, e.source_id)
+        if achado:
+            st.toast(f"{e.source_id} agora aparece no SIMBAD como {achado[0]} ({achado[1]}). "
+                     "Registre a resposta no painel de envio.", icon="🔭")
 
 
 def marcar_marco(nome: str):
@@ -195,6 +241,12 @@ todos, erros_cruz = cruzamento.completar(todos, "a fila", "candidato")
 todos["allwise_ordem"] = todos["allwise_status"].map(ALLWISE_ORDEM).fillna(2)
 
 todos["decisao"] = todos["decisao"].fillna("pendente")
+with conectar() as conn:
+    envios = envio.ler_envios(conn)
+_envios = {e["source_id"]: e for e in envios.to_dict("records")}
+todos["envio"] = [envio.situacao_envio(d, _envios.get(s))
+                  for s, d in zip(todos["source_id"], todos["decisao"])]
+checar_publicados(todos, envios)
 
 # ---------------------------------------------------------------- filtros
 st.sidebar.header("Filtros")
@@ -214,6 +266,12 @@ situacao = st.sidebar.radio("Situação", list(OPCOES_SITUACAO), index=0, key="s
                             captions=[str(int(sum(contagem.get(d, 0) for d in v)))
                                       for v in OPCOES_SITUACAO.values()])
 sel_decisao = OPCOES_SITUACAO[situacao]
+OPCOES_ENVIO = {"Qualquer": None, "A enviar": "a enviar", "Enviados": "enviado",
+                "Aceitos": "aceito", "Recusados": "recusado"}
+sel_envio = st.sidebar.selectbox(
+    "Envio", list(OPCOES_ENVIO), key="envio_filtro",
+    help="Confirmados a enviar a um astrônomo e os já enviados. Fora de 'Qualquer', vale no "
+         "lugar da Situação.")
 gaia = st.sidebar.radio("Contraparte no Gaia", ["Qualquer", "Sem Gaia", "Com Gaia"], index=1,
                         help="Com Gaia costuma ser estrela comum já conhecida.")
 ps1 = st.sidebar.radio("Detecção óptica (Pan-STARRS)", ["Qualquer", "Sem detecção", "Com detecção"],
@@ -236,7 +294,9 @@ if busca:
     fila = todos[todos["source_id"].str.contains(busca, case=False, regex=False)]
     st.sidebar.info(f"Busca ativa: {len(fila)} resultado(s), outros filtros ignorados.")
 else:
-    fila = todos[todos["decisao"].isin(sel_decisao) & (todos["pm_signif"] >= sig_min)
+    base = (todos["decisao"].isin(sel_decisao) if OPCOES_ENVIO[sel_envio] is None
+            else todos["envio"] == OPCOES_ENVIO[sel_envio])
+    fila = todos[base & (todos["pm_signif"] >= sig_min)
                  & todos["llm_triage_score"].isin(sel_scores)]
     if gaia != "Qualquer" and todos["gaia_detectada"].notna().any():
         fila = fila[fila["gaia_detectada"] == (gaia == "Com Gaia")]
@@ -250,7 +310,7 @@ chaves = ORDENACOES[ordem]
 fila = fila.sort_values([c for c, _ in chaves], ascending=[a for _, a in chaves]).reset_index(drop=True)
 total = len(fila)
 
-assinatura = (busca, tuple(sel_decisao), gaia, ps1, allwise, sig_min, tuple(sel_scores), ordem)
+assinatura = (busca, tuple(sel_decisao), sel_envio, gaia, ps1, allwise, sig_min, tuple(sel_scores), ordem)
 if st.session_state.get("assinatura") != assinatura:
     st.session_state.assinatura = assinatura
     st.session_state.pos = 0
@@ -357,6 +417,60 @@ with st.expander(f"Fila completa ({total}): clique numa linha pra abrir o candid
     st.dataframe(tabela, hide_index=True, on_select="rerun", selection_mode="single-row",
                  key="tabela_fila", height=260)
 
+# ---------------------------------------------------------------- envio (conferencia e resposta)
+if r["decisao"] == "confirmado" or r["envio"]:
+    with conectar() as conn:
+        viz = envio.ler_vizier(conn, sid)
+    e = _envios.get(sid)
+    with st.expander("Enviar a um astrônomo: conferência e acompanhamento",
+                     expanded=r["envio"] == "a enviar"):
+        itens_envio = envio.pendencias(r.to_dict(), viz, enviado=r["envio"] == "enviado")
+        if envio.pode_enviar(itens_envio):
+            st.success("**Pode enviar.** Conferido: "
+                       + ", ".join(i["titulo"].lower() for i in itens_envio) + ".")
+        else:
+            st.warning("**Ainda não envie.** " + envio.proximo_passo(itens_envio))
+        st.markdown("\n".join(f"- {envio.ICONES[i['nivel']]} **{i['titulo']}**: {i['texto']}"
+                              for i in itens_envio))
+        if viz is None or viz.attrs.get("parcial"):
+            if st.button("Buscar no VizieR", key=f"vizier_envio_{sid}"):
+                with st.spinner("Consultando o VizieR (20 s a 1 min)..."):
+                    try:
+                        achados = vizier(float(r["ra"]), float(r["dec"]), float(r["pm_total"]))
+                        with conectar() as conn:
+                            envio.salvar_vizier(conn, sid, achados)
+                        st.rerun()
+                    except Exception as erro:
+                        st.error(f"VizieR falhou: {erro}")
+        st.markdown("**Resumo em inglês**, para colar no e-mail ou no formulário:")
+        st.code(envio.resumo_ingles(r.to_dict(), viz), language=None)
+        if not e:
+            st.text_input("Para quem ou onde vai enviar",
+                          placeholder="ex.: e-mail a um astrônomo, fórum do Backyard Worlds",
+                          key=f"destino_{sid}")
+            bloqueado = any(i["nivel"] == "bloqueia" for i in itens_envio)
+            st.button("Marquei como enviado hoje", on_click=marcar_enviado, args=(sid,),
+                      disabled=bloqueado or not st.session_state.get(f"destino_{sid}", "").strip(),
+                      help="Desligado enquanto algum item da conferência bloqueia.")
+        elif r["envio"] == "enviado":
+            st.info(f"Enviado em {e['enviado_em']} para {e['destino']}. O app confere no SIMBAD, "
+                    "uma vez por dia, se o objeto já apareceu como anã.")
+            st.radio("Resposta", ["Aceito", "Recusado"], horizontal=True, key=f"aceito_{sid}",
+                     help="Aceito: a segunda opinião confirmou, ou o objeto foi publicado.")
+            st.text_input("O que responderam (opcional)", key=f"resposta_{sid}")
+            st.text_input("Identificador externo (opcional)", placeholder="ex.: nome no catálogo",
+                          key=f"ident_{sid}")
+            esq, dir_ = st.columns(2)
+            esq.button("Registrar resposta", type="primary", on_click=registrar_resposta,
+                       args=(sid,), key=f"resp_{sid}")
+            dir_.button("Desfazer envio", on_click=desfazer_envio, args=(sid,), key=f"desf_{sid}")
+        else:
+            texto = (f"Resposta em {e['respondido_em']}: **{'aceito' if r['envio'] == 'aceito' else 'recusado'}**"
+                     + (f". {e['resposta']}" if e.get("resposta") else "")
+                     + (f" ({e['identificador']})" if e.get("identificador") else ""))
+            (st.success if r["envio"] == "aceito" else st.error)(texto)
+            st.button("Desfazer envio", on_click=desfazer_envio, args=(sid,), key=f"desf_{sid}")
+
 # ---------------------------------------------------------------- relatorio (Fase 7)
 with st.expander("Relatório (Fase 7): página HTML com os confirmados"):
     com_duvidas = st.checkbox("Incluir dúvidas", value=False)
@@ -381,6 +495,8 @@ with st.expander("Já foi publicado? (busca no VizieR inteiro)"):
                          unsafe_allow_html=True)
         try:
             achados = vizier(float(r["ra"]), float(r["dec"]), float(r["pm_total"]))
+            with conectar() as conn:
+                envio.salvar_vizier(conn, sid, achados)
             aguarde.empty()
             anas = achados[achados["lista_anas"]]
             if achados.attrs.get("parcial"):

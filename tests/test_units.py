@@ -489,5 +489,92 @@ def test_cruzar_local():
     assert len(cruzar_local(np.array([]), np.array([]), ra_cat, dec_cat, 5)) == 0
 
 
+def _confirmado_bom():
+    return {"source_id": "1506p181_b0-000001", "ra": 150.0, "dec": 20.0, "pmra": 0.3,
+            "pmdec": -0.4, "sigpmra": 0.01, "sigpmdec": 0.01, "pm_total": 0.5, "pm_signif": 30.0,
+            "w1mpro": 16.0, "w2mpro": 14.8, "cor_w1w2": 1.2, "meanobsmjd": 57170.0,
+            "allwise_status": "consistente", "gaia_detectada": False, "gaia_g": None,
+            "ps1_detectada": False, "status": "candidato", "decisao": "confirmado"}
+
+
+def _vizier(linhas, parcial=False):
+    import pandas as pd
+    df = pd.DataFrame(linhas, columns=["catalogo", "descricao", "dist_arcsec", "lista_anas"])
+    df.attrs["parcial"] = parcial
+    return df
+
+
+def test_envio_pendencias():
+    from app import envio
+    r = _confirmado_bom()
+    # sem a busca no VizieR: atencao, nao pode enviar
+    itens = envio.pendencias(r, None)
+    assert not envio.pode_enviar(itens)
+    assert envio.proximo_passo(itens).startswith("Busca no VizieR")
+    # VizieR so com catalogos gerais: tudo ok
+    ok = _vizier([("II/328/allwise", "AllWISE", 1.0, False)])
+    assert envio.pode_enviar(envio.pendencias(r, ok)) and envio.proximo_passo(envio.pendencias(r, ok)) == ""
+    # lista de anas dentro do quanto ele andou desde 2000 (0,5"/ano x 16 anos + 2"): bloqueia
+    raio = envio.raio_mesmo_objeto(0.5, 57170.0)
+    assert 9 < raio < 11
+    perto = _vizier([("J/X/1", "brown dwarfs", raio - 1, True)])
+    assert [i["nivel"] for i in envio.pendencias(r, perto) if i["titulo"] == "Busca no VizieR"] == ["bloqueia"]
+    # mais longe que isso: outro objeto, ok
+    longe = _vizier([("J/X/1", "brown dwarfs", raio + 5, True)])
+    assert envio.pode_enviar(envio.pendencias(r, longe))
+    # busca limitada (CDS fora): atencao
+    assert not envio.pode_enviar(envio.pendencias(r, _vizier([], parcial=True)))
+    # nao confirmado, ou ja conhecido, bloqueia
+    assert envio.pendencias({**r, "decisao": "duvida"}, ok)[0]["nivel"] == "bloqueia"
+    conhecido = {**r, "status": "conhecido", "catalogo_match": "Karpov+2025"}
+    assert any(i["nivel"] == "bloqueia" and "Karpov" in i["texto"]
+               for i in envio.pendencias(conhecido, ok))
+    # ja enviado: atencao para nao reenviar
+    assert not envio.pode_enviar(envio.pendencias(r, ok, enviado=True))
+    # checklist com problema (AllWISE parado) bloqueia
+    assert any(i["nivel"] == "bloqueia" for i in envio.pendencias({**r, "allwise_status": "parado"}, ok))
+
+
+def test_envio_situacao():
+    from app import envio
+    assert envio.situacao_envio("confirmado", None) == "a enviar"
+    assert envio.situacao_envio("duvida", None) == ""
+    assert envio.situacao_envio("confirmado", {"enviado_em": "2026-11-16", "aceito": None}) == "enviado"
+    assert envio.situacao_envio("confirmado", {"enviado_em": "2026-11-16", "aceito": float("nan")}) == "enviado"
+    assert envio.situacao_envio("confirmado", {"enviado_em": "2026-11-16", "aceito": 1}) == "aceito"
+    assert envio.situacao_envio("confirmado", {"enviado_em": "2026-11-16", "aceito": 0}) == "recusado"
+
+
+def test_envio_resumo_ingles():
+    from app import envio
+    texto = envio.resumo_ingles(_confirmado_bom(), _vizier([("II/328/allwise", "AllWISE", 1.0, False)]))
+    assert "RA 150.000000, Dec +20.000000" in texto
+    assert "pmRA 300 +/- 10, pmDec -400 +/- 10 mas/yr (total 500 mas/yr, 30.0 sigma)" in texto
+    assert "W1-W2 = 1.20" in texto and 'Gaia DR3: no counterpart within 3"' in texto
+    assert "all of VizieR" in texto and texto.endswith(envio.PROCEDENCIA)
+    assert "not checked" not in texto
+    sem = envio.resumo_ingles({**_confirmado_bom(), "gaia_detectada": None}, None)
+    assert "Gaia DR3: not checked" in sem and "VizieR search" not in sem
+    assert "—" not in texto
+
+
+def test_envio_banco():
+    import sqlite3
+    from app import envio
+    conn = sqlite3.connect(":memory:")
+    assert envio.ler_vizier(conn, "x") is None
+    envio.salvar_vizier(conn, "x", _vizier([("J/X/1", "brown dwarfs", 3.0, True)], parcial=True))
+    v = envio.ler_vizier(conn, "x")
+    assert v.attrs["parcial"] and bool(v["lista_anas"].iloc[0]) and v["dist_arcsec"].iloc[0] == 3.0
+    envio.marcar_enviado(conn, "x", "  e-mail  ", "2026-11-16")
+    e = envio.ler_envios(conn).iloc[0].to_dict()
+    assert e["destino"] == "e-mail" and envio.situacao_envio("confirmado", e) == "enviado"
+    envio.registrar_resposta(conn, "x", True, "ok", "CWISE J1", "2026-12-01")
+    e = envio.ler_envios(conn).iloc[0].to_dict()
+    assert envio.situacao_envio("confirmado", e) == "aceito" and e["identificador"] == "CWISE J1"
+    envio.desfazer_envio(conn, "x")
+    assert envio.ler_envios(conn).empty
+
+
 if __name__ == "__main__":
     _main()

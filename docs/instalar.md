@@ -2,7 +2,7 @@
 
 Para usar o Rastro no Windows ou no macOS sem digitar comandos. Tudo depois da instalação acontece no navegador: buscar candidatos, revisar, treinar e gerar o relatório.
 
-O app nunca foi usado de verdade no Windows nem no macOS, embora os testes automáticos rodem nos dois a cada mudança. Se algo der errado, abra uma [issue](https://github.com/mpena2099/rastro/issues) com a mensagem que apareceu na janela.
+O app nunca foi usado de verdade no Windows nem no macOS, embora os testes automáticos rodem nos dois a cada mudança. Se algo der errado, abra uma conversa em [Discussões](https://github.com/mpena2099/rastro/discussions) com a mensagem que apareceu na janela.
 
 ## 1. Instale o Python
 
@@ -45,4 +45,4 @@ Baixe o ZIP de novo e descompacte por cima da pasta antiga. A pasta `data/`, com
 | "Python não encontrado" | Instale o Python (passo 1). No Windows, reinstale marcando "Add python.exe to PATH" |
 | A instalação para com erro | Confira a internet e abra o iniciador de novo: ele retoma |
 | O navegador não abre | Abra à mão o endereço que a janela mostra (`http://localhost:8501`) |
-| A janela fecha sozinha logo ao abrir | Rode o iniciador pelo Terminal (ou Prompt de Comando) para ver a mensagem e mande-a numa [issue](https://github.com/mpena2099/rastro/issues) |
+| A janela fecha sozinha logo ao abrir | Rode o iniciador pelo Terminal (ou Prompt de Comando) para ver a mensagem e mande-a em [Discussões](https://github.com/mpena2099/rastro/discussions) |

@@ -5,7 +5,7 @@
 [![Licença: MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](requirements.txt)
 [![demo: online](https://img.shields.io/badge/demo-online-2e7d32.svg)](https://rastro-treino.streamlit.app)
-[![Issues](https://img.shields.io/badge/d%C3%BAvidas-issues-555.svg)](https://github.com/mpena2099/rastro/issues)
+[![Discussões](https://img.shields.io/badge/chat-Discuss%C3%B5es-555.svg)](https://github.com/mpena2099/rastro/discussions)
 
 Pipeline de mineração de dados astronômicos que caça **anãs marrons e estrelas frias próximas ao Sol** ainda não catalogadas, procurando por **movimento próprio anômalo** no catálogo público **CatWISE2020**.
 
@@ -237,6 +237,7 @@ Na barra lateral:
 - **Buscar por código:** acha qualquer candidato pelo código (ou pelo final dele), em qualquer situação.
 - **Filtros** de Gaia, Pan-STARRS, movimento no AllWISE, PM/σ mínimo e nota da IA, e a **ordenação**.
 - **Já foi publicado?** Um botão consulta o VizieR inteiro em volta do candidato e destaca os catálogos de anãs ou de movimento próprio, com a distância. A Fase 4 só cruza as listas conhecidas, e é assim que se acha um catálogo novo que ainda não entrou nelas. Use antes de confirmar. O relatório da Fase 7 faz a mesma busca para cada candidato.
+- **Enviar a um astrônomo:** para cada confirmado, um painel diz se ele **pode ir para fora** (todos os itens ok: checklist, SIMBAD, listas de anãs e busca no VizieR, que decide pela distância se a lista achada é o mesmo objeto), traz um resumo em inglês pronto para colar e registra o envio e a resposta. O filtro **Envio** separa a enviar, enviados, aceitos e recusados; o app confere uma vez por dia se um enviado já aparece no SIMBAD como anã. Detalhes em [Relatório e segunda opinião](https://mpena2099.github.io/rastro/relatorio/).
 - **Relatório (Fase 7):** no corpo da página, o botão "Gerar relatório" monta uma página HTML com os confirmados (ou confirmados e dúvidas, se marcar a caixa) e o botão "Baixar relatório" entrega o arquivo. Leva alguns segundos por candidato, para baixar os recortes.
 - No corpo da página, o quadro "Fila completa" lista a fila, e um clique numa linha abre aquele candidato.
 
