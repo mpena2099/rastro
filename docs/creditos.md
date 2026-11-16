@@ -15,6 +15,7 @@ Este projeto usou o banco de dados SIMBAD e o serviço VizieR, operados no CDS, 
 - Luhman (2014, ApJ 786, L18): descoberta da WISE 0855-0714 por comparação de épocas do WISE.
 - Backyard Worlds: Planet 9 (Zooniverse): ciência cidadã que já achou centenas de anãs frias em dados públicos do WISE; um voluntário, Frank Kiwy, achou sozinho dezenas de binárias ultrafrias.
 - Karpov et al. (2025, A&A 695, A195): lista de candidatas fotométricas que já continha o melhor candidato achado aqui (CWISE J100116.36+184013.6).
+- Schneider et al. (2026, AJ 171, 341): 3.086 candidatas L e T do Backyard Worlds confirmadas por movimento; a Fase 4 descarta quem já está nessa lista.
 
 ## Licença
 

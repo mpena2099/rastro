@@ -88,6 +88,11 @@ CATALOGOS_ANAS = {
     "J/MNRAS/489/5301/desy3-lt": "Carnero Rosell+2019 (DES)",
 }
 CATALOGOS_RAIO_ARCSEC = 5
+# Listas que ainda nao estao no VizieR: CSV (nome, ra, dec) no git, na epoca do CatWISE,
+# cruzado localmente com o mesmo raio. Gerado por tools/baixar_schneider2026.py.
+CATALOGOS_ANAS_LOCAIS = {
+    "catalogos/schneider2026.csv": "Schneider+2026 (Backyard Worlds)",
+}
 
 # Fase 5 — LLM triage (provider-agnostico, endpoint OpenAI-compativel)
 #

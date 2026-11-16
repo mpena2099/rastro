@@ -475,5 +475,19 @@ def test_marcos():
     assert not dados_.marcos(conn)[3]["feito"]
 
 
+def test_cruzar_local():
+    import numpy as np
+    from src.known_catalog_match import cruzar_local
+    ra_cat, dec_cat = np.array([150.0, 10.0]), np.array([20.0, -5.0])
+    # 4" dentro do raio de 5"; 6" fora; perto de ra=0/360 tambem casa
+    ra = np.array([150.0, 150.0, 359.9999, 10.0 + 4 / 3600 / np.cos(np.radians(-5))])
+    dec = np.array([20.0 + 4 / 3600, 20.0 + 6 / 3600, 0.0, -5.0])
+    m = cruzar_local(ra, dec, ra_cat, dec_cat, 5)
+    assert list(m) == [True, False, False, True]
+    assert list(cruzar_local(np.array([0.0]), np.array([0.0]), np.array([359.9995]),
+                             np.array([0.0]), 5)) == [True]
+    assert len(cruzar_local(np.array([]), np.array([]), ra_cat, dec_cat, 5)) == 0
+
+
 if __name__ == "__main__":
     _main()

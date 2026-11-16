@@ -6,7 +6,7 @@ from astropy.table import Table
 from astroquery.xmatch import XMatch
 import astropy.units as u
 
-from config import (CATALOGOS_ANAS, CATALOGOS_RAIO_ARCSEC, REDE_PRAZO_S, SQLITE_PATH,
+from config import (CATALOGOS_ANAS, CATALOGOS_ANAS_LOCAIS, CATALOGOS_RAIO_ARCSEC, ROOT, REDE_PRAZO_S, SQLITE_PATH,
                     SIMBAD_DELAY_S, SIMBAD_RADIUS_ARCSEC)
 from src.util import com_prazo
 
@@ -36,11 +36,40 @@ def marcar_catalogos(df: pd.DataFrame, achados: dict[str, str]) -> pd.DataFrame:
     return df
 
 
+def cruzar_local(ra: np.ndarray, dec: np.ndarray, ra_cat: np.ndarray, dec_cat: np.ndarray,
+                 raio_arcsec: float) -> np.ndarray:
+    """Mascara das posicoes com algum objeto do catalogo a ate raio_arcsec (forca bruta)."""
+    if len(ra) == 0 or len(ra_cat) == 0:
+        return np.zeros(len(ra), dtype=bool)
+    r1, d1 = np.radians(ra)[:, None], np.radians(dec)[:, None]
+    r2, d2 = np.radians(ra_cat)[None, :], np.radians(dec_cat)[None, :]
+    cos = np.sin(d1) * np.sin(d2) + np.cos(d1) * np.cos(d2) * np.cos(r1 - r2)
+    return np.degrees(np.arccos(np.clip(cos.max(axis=1), -1, 1))) * 3600 <= raio_arcsec
+
+
+def _cruzar_locais(cand: pd.DataFrame, posicoes, achados: dict[str, str]):
+    for arquivo, nome in CATALOGOS_ANAS_LOCAIS.items():
+        try:
+            cat = pd.read_csv(ROOT / arquivo)
+        except Exception as e:
+            print(f"  AVISO {nome}: {str(e)[:100]}")
+            continue
+        mask = np.zeros(len(cand), dtype=bool)
+        for ra, dec in posicoes:
+            mask |= cruzar_local(ra.values, dec.values, cat["ra"].values, cat["dec"].values,
+                                 CATALOGOS_RAIO_ARCSEC)
+        for s in cand["source_id"].values[mask]:
+            achados.setdefault(str(s), nome)
+        if mask.any():
+            print(f"  {nome}: {int(mask.sum())}")
+
+
 def _cruzar_catalogos(df: pd.DataFrame) -> pd.DataFrame:
     cand = df[df["status"] == "candidato"]
     if cand.empty:
         return marcar_catalogos(df, {})
-    print(f"\nCruzando {len(cand)} candidatos com {len(CATALOGOS_ANAS)} listas de anas (VizieR)...")
+    print(f"\nCruzando {len(cand)} candidatos com "
+          f"{len(CATALOGOS_ANAS) + len(CATALOGOS_ANAS_LOCAIS)} listas de anas...")
     ra2000, dec2000 = posicao_j2000(cand)
     posicoes = ((cand["ra"], cand["dec"]), (ra2000, dec2000))
     achados = {}
@@ -62,6 +91,7 @@ def _cruzar_catalogos(df: pd.DataFrame) -> pd.DataFrame:
             achados.setdefault(s, nome)
         if ids:
             print(f"  {nome}: {len(ids)}")
+    _cruzar_locais(cand, posicoes, achados)
     return marcar_catalogos(df, achados)
 
 
