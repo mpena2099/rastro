@@ -6,6 +6,7 @@ função que os preenche: a página chama no fim, como a animação.
 """
 
 import sqlite3
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -13,6 +14,8 @@ import streamlit as st
 from app import dados, imagens
 from config import DEMO, REDE_PRAZO_S, ROOT, SQLITE_PATH
 from src.util import com_prazo
+
+DEMO_DB = ROOT / "demo" / "treino_demo.db"
 
 # Como ler as imagens, mostrado no topo do guia
 LEITURA = ("**Como ler as imagens.** Uma anã marrom é fria (abaixo de ~2000 °C) e brilha quase só "
@@ -79,11 +82,38 @@ def casos_de_treino(semente: int = 42) -> pd.DataFrame:
     """Anãs conhecidas, estrelas comuns do SIMBAD e rejeitados da Fase 3, com resposta."""
     if DEMO:
         # demo online: conjunto pronto (tools/gerar_demo.py), sem SIMBAD nem o pickle do recall
-        with sqlite3.connect(str(SQLITE_PATH)) as conn:
-            pool = pd.read_sql("SELECT * FROM casos_treino_demo", conn)
-        n = int(pool["resposta"].value_counts().min())
-        return (pool.groupby("resposta", group_keys=False).sample(n=min(n, 20), random_state=semente)
-                .sample(frac=1, random_state=semente).reset_index(drop=True))
+        return _amostra_demo(SQLITE_PATH, semente)
+    try:
+        return _casos_locais(semente)
+    except Exception:
+        # primeiro uso (sem busca ou sem o pickle do recall): o conjunto da demo vai no git
+        _copiar_cruzamentos_demo()
+        return _amostra_demo(DEMO_DB, semente)
+
+
+def _amostra_demo(banco: Path, semente: int) -> pd.DataFrame:
+    with sqlite3.connect(str(banco)) as conn:
+        pool = pd.read_sql("SELECT * FROM casos_treino_demo", conn)
+    n = int(pool["resposta"].value_counts().min())
+    return (pool.groupby("resposta", group_keys=False).sample(n=min(n, 20), random_state=semente)
+            .sample(frac=1, random_state=semente).reset_index(drop=True))
+
+
+def _copiar_cruzamentos_demo():
+    """Gaia/Pan-STARRS/AllWISE prontos dos casos da demo, para o treino local nao ir a rede."""
+    with sqlite3.connect(str(DEMO_DB)) as conn:
+        demo = pd.read_sql("SELECT * FROM cruzamentos_app", conn)
+    SQLITE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(str(SQLITE_PATH)) as conn:
+        try:
+            ja = set(pd.read_sql("SELECT source_id FROM cruzamentos_app", conn)["source_id"])
+        except Exception:
+            ja = set()
+        demo[~demo["source_id"].isin(ja)].to_sql("cruzamentos_app", conn, if_exists="append",
+                                                 index=False)
+
+
+def _casos_locais(semente: int) -> pd.DataFrame:
     with sqlite3.connect(str(SQLITE_PATH)) as conn:
         # so quem tem nome no SIMBAD: catalogo_match sem SIMBAD pode ser ana ja publicada
         estrelas = pd.read_sql(

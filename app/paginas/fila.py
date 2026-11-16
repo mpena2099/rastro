@@ -154,20 +154,25 @@ def painel_busca(pendentes: int):
     if pendentes == 0:
         st.success("Fila revisada: nenhum candidato pendente.")
         botao_buscar("buscar_fim")
+    elif pendentes < 0:  # banco vazio: primeira busca
+        botao_buscar("buscar_primeira")
 
 
 # ---------------------------------------------------------------- dados
 try:
     with conectar() as conn:
         todos = dados.carregar_candidatos(conn)
-except Exception as e:
-    st.error(f"Não consegui ler os candidatos em {SQLITE_PATH}: {e}\n\n"
-             "Rode `python pipeline.py` (ou as fases 2 a 4) antes de abrir o app.")
-    st.stop()
+except Exception:
+    # primeiro uso: ainda nao ha banco; quem instalou pelo iniciador nao tem terminal
+    todos = pd.DataFrame()
 
 if todos.empty:
-    st.warning("A tabela candidatos_fase4 não tem candidatos.")
-    painel_busca(0)
+    estilo.cabecalho("Revisão visual", (0, 0), descricao=DESCRICAO)
+    if not execucao.rodando():
+        st.info("Ainda não há candidatos. A primeira busca baixa uma região do céu do "
+                "CatWISE2020, filtra e descarta os objetos já conhecidos; os que sobram "
+                "aparecem aqui. Enquanto ela roda, faça o Treino para aprender a revisar.")
+    painel_busca(-1)
     st.stop()
 
 todos["decisao"] = todos["decisao"].fillna("pendente")

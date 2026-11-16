@@ -184,7 +184,9 @@ Fases sequenciais. Cada uma lê a tabela produzida pela anterior no SQLite e gra
 
 ## Como usar
 
-O uso tem duas partes, uma no terminal e outra no navegador:
+**Sem terminal (Windows e macOS):** instale o Python, baixe o ZIP e clique duas vezes em `iniciar_rastro.bat` (Windows) ou `iniciar_rastro.command` (macOS). O passo a passo está em [`docs/instalar.md`](docs/instalar.md). A busca de candidatos também roda pelo app, no botão "Buscar mais candidatas".
+
+Pelo terminal, o uso tem duas partes, uma no terminal e outra no navegador:
 
 | Parte | Onde | Comando | Para quê |
 |---|---|---|---|
@@ -269,7 +271,7 @@ Não há mocks das APIs externas (IRSA/SIMBAD/LLM): a filosofia aqui é validar 
 
 ## Triagem por LLM (Fase 5)
 
-Esta é a única fase que precisa de chave. É **provider-agnóstico**: fala o formato OpenAI (`/chat/completions`) via `httpx`, sem SDK. Trocar de provider é só mudar três coisas em `config.py`: `LLM_BASE_URL`, `LLM_MODEL` e de onde vem a chave. Há exemplos comentados pra Gemini, OpenRouter, Zhipu e Ollama.
+Esta é a única fase que precisa de chave, e é opcional: sem chave, a busca pula a triagem e os candidatos entram na fila como "sem triagem". É **provider-agnóstico**: fala o formato OpenAI (`/chat/completions`) via `httpx`, sem SDK. Trocar de provider é só mudar três coisas em `config.py`: `LLM_BASE_URL`, `LLM_MODEL` e de onde vem a chave. Há exemplos comentados pra Gemini, OpenRouter, Zhipu e Ollama.
 
 - **Default: Groq free** (`openai/gpt-oss-20b`, modo texto com `reasoning_effort` baixo). Chave grátis, sem cartão, em [console.groq.com](https://console.groq.com). Cota (tokens/min e tokens/dia) é **por modelo**, então dá pra alternar de modelo se um esgotar.
 - **Alternativa sem cota diária** (pra iterar bastante): **Zhipu GLM-4.7-Flash**, perpetuamente free (exemplo pronto no `config.py`).

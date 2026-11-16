@@ -230,7 +230,12 @@ def run():
     print("Fase 5 — Triagem LLM")
     print("=" * 50)
 
-    api_key = load_api_key()
+    try:
+        api_key = load_api_key()
+    except ValueError as e:
+        # a triagem e opcional: sem chave, a fila mostra os candidatos como "sem triagem"
+        print(f"{e}\nPulando a triagem LLM: os candidatos entram na fila sem triagem.")
+        return
     print(f"Provider: {LLM_BASE_URL}")
     print(f"Modelo: {LLM_MODEL}")
     print(f"API key: {('...' + api_key[-4:]) if api_key else '(sem chave)'}")

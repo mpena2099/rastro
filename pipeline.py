@@ -43,7 +43,7 @@ def run_all(campo: dict | None = None):
     with sqlite3.connect(SQLITE_PATH) as con:
         campos.registrar(con, feito, resultado.get("candidatos"))
     print(f"\n  Campo {feito['nome']} registrado em campos_feitos.")
-    print("  Revisao: streamlit run app/revisao.py")
+    print("  Revisao: python iniciar.py")
 
 
 if __name__ == "__main__":
