@@ -5,6 +5,18 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    # um so sistema e uma versao: o lint nao muda com a matriz
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ruff
+      # B905 (zip sem strict=) fica de fora: mudaria comportamento sem ganho
+      - run: ruff check --select F,B,E9 --ignore B905 --exclude venv .
+
   unidade:
     strategy:
       fail-fast: false
