@@ -21,6 +21,7 @@ from src.proper_motion import add_pm_columns
 from src.llm_triage import parse_score, interpret_response
 from src.fetch_field import build_query, make_tiles
 from src.quality_filter import pmcode_sem_troca
+from src.known_catalog_match import posicao_j2000, MJD_J2000
 import config
 
 
@@ -68,6 +69,24 @@ def test_interpret_response_none_e_texto():
     assert interpret_response(None) == ("", "media")
     notes, score = interpret_response("analise...\nVEREDITO: incerta")
     assert score == "incerta"
+
+
+def test_posicao_j2000():
+    # pmra/pmdec do CatWISE em "/ano (nao mas/ano). 10 anos depois de J2000, 1"/ano
+    # em dec=60 (cos=0,5) volta 10" em dec e 20" em coordenada RA (10" no ceu / cos dec).
+    df = pd.DataFrame({"ra": [100.0], "dec": [60.0], "pmra": [1.0], "pmdec": [1.0],
+                       "meanobsmjd": [MJD_J2000 + 10 * 365.25]})
+    ra, dec = posicao_j2000(df)
+    assert abs((100.0 - ra.iloc[0]) * 3600 - 20.0) < 1e-6
+    assert abs((60.0 - dec.iloc[0]) * 3600 - 10.0) < 1e-6
+
+
+def test_posicao_j2000_pm_zero():
+    # sem movimento proprio a posicao nao muda, qualquer que seja a epoca
+    df = pd.DataFrame({"ra": [10.0, 359.9], "dec": [-20.0, 5.0], "pmra": [0.0, 0.0],
+                       "pmdec": [0.0, 0.0], "meanobsmjd": [MJD_J2000 + 15 * 365.25, MJD_J2000]})
+    ra, dec = posicao_j2000(df)
+    assert ra.tolist() == [10.0, 359.9] and dec.tolist() == [-20.0, 5.0]
 
 
 def test_pmcode_sem_troca():
@@ -573,6 +592,30 @@ def test_envio_banco():
     assert envio.situacao_envio("confirmado", e) == "aceito" and e["identificador"] == "CWISE J1"
     envio.desfazer_envio(conn, "x")
     assert envio.ler_envios(conn).empty
+
+
+def test_app_demo_fumaca():
+    # Um erro de import ou de layout so aparecia abrindo o app na mao. Roda num
+    # subprocesso (app/demo.py descarta os modulos do projeto da memoria) e com proxy
+    # morto, para valer como teste offline: CDS/IRSA e as imagens falham na hora e o
+    # app tem que abrir mesmo assim.
+    import subprocess
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    script = """
+from streamlit.testing.v1 import AppTest
+at = AppTest.from_file("app/demo.py", default_timeout=90).run()
+assert not at.exception, at.exception
+rotulos = [b.label for b in at.button]
+assert "Confirmar" in rotulos and "Descartar" in rotulos, rotulos
+"""
+    env = {**os.environ, "RASTRO_DEMO": "1",
+           "HTTP_PROXY": "http://127.0.0.1:9", "HTTPS_PROXY": "http://127.0.0.1:9",
+           "http_proxy": "http://127.0.0.1:9", "https_proxy": "http://127.0.0.1:9"}
+    env.pop("NO_PROXY", None)
+    env.pop("no_proxy", None)
+    r = subprocess.run([sys.executable, "-W", "ignore", "-c", script], cwd=raiz, env=env,
+                       capture_output=True, text=True, timeout=180)
+    assert r.returncode == 0, (r.stdout + r.stderr)[-2000:]
 
 
 if __name__ == "__main__":
