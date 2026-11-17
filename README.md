@@ -184,7 +184,7 @@ Fases sequenciais. Cada uma lê a tabela produzida pela anterior no SQLite e gra
 | 3 | **Filtragem fina de qualidade**: remove contaminação/artefatos por `cc_flags`/`ab_flags`, troca do componente principal (`pmcode` B=N), confusão de fontes (`n_aw`) e movimento próprio pouco significativo (PM/σ < 8) | ✅ |
 | 4 | **Cross-match contra SIMBAD** (via CDS XMatch em lote): descarta o que já é catalogado. O SIMBAD usa posições em J2000 e o CatWISE mede em ~2015, então a posição é recuada pelo movimento próprio antes do match. Sem isso, fontes com PM acima de ~0,3"/ano escapam como "novas". Depois, os que sobram são cruzados com 11 listas de anãs frias do VizieR (`CATALOGOS_ANAS` em `config.py`, como Karpov+2025, Kirkpatrick+2021/2024 e Best+2018) e com as 3.086 candidatas L/T do Backyard Worlds em Schneider+2026, que ainda não estão no VizieR (`catalogos/schneider2026.csv`), nas duas épocas, porque o SIMBAD demora a absorver catálogos novos | ✅ |
 | 5 | **Triagem assistida por LLM**: prioriza os candidatos por consistência com uma anã L, T ou Y. A LLM ordena esforço humano, **nunca dá o veredito final**. O score varia entre rodadas (cerca de 1/3 dos candidatos mudam), então vale só como prioridade | ✅ |
-| 6 | **Inspeção visual humana** (app Streamlit): recortes unWISE e óptico com mira na posição, animação do W2 por época, checklist com sugestão do pipeline, números, link pro WiseView, teste de movimento contra o AllWISE, busca por código e filtro por situação, decisão confirmar/dúvida/descartar gravada em `revisao_humana`. O notebook `inspecao_visual.ipynb` é a versão antiga, só com links | ✅ |
+| 6 | **Inspeção visual humana** (app Streamlit): recortes unWISE e óptico com mira na posição, animação do W2 por época, checklist com sugestão do pipeline, números, link pro WiseView, teste de movimento contra o AllWISE, busca por código e filtro por situação, decisão confirmar/dúvida/descartar gravada em `revisao_humana` | ✅ |
 | 7 | **Relatório** dos confirmados (HTML com imagens embutidas), gerado por botão no app ou por `python src/relatorio.py` (que também grava um CSV), pra enviar a um astrônomo e pedir uma segunda opinião. Manual, como a Fase 6 | ✅ |
 
 **Quanto os cortes deixam passar.** Os limiares foram medidos contra 949 anãs L/T/Y já conhecidas (`python tools/recall_conhecidas.py`, usa rede, ~8 min). Com os cortes atuais passam **76%** delas (L 80%, T 70%, Y 77%). Duas medições mudaram o desenho: filtrar o primeiro dígito do `pmcode` (A=1) derrubava o recall de 76% pra 25%, porque ele mede vizinhança e não qualidade; e cortar por SNR em W1 perdia metade das anãs Y. As conhecidas são as mais brilhantes, então o recall pra anãs ainda não descobertas tende a ser menor.
@@ -342,9 +342,15 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
 ```
 .
 ├── pipeline.py              # entrypoint (roda as fases 1-5)
+├── iniciar.py               # primeiro uso passo a passo, chamado pelos iniciadores
+├── iniciar_rastro.bat       # Windows: cria o venv, instala e abre o app
+├── iniciar_rastro.command   # macOS e Linux: idem
 ├── config.py                # toda a parametrizacao
 ├── requirements.txt
+├── CITATION.cff             # como citar o projeto
+├── mkdocs.yml               # site de documentacao (MkDocs Material)
 ├── README.md
+├── CHANGELOG.md             # o que cada versao entrega
 ├── src/
 │   ├── sanity_check.py      # Fase 1
 │   ├── fetch_field.py       # Fase 2
@@ -353,12 +359,14 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
 │   ├── llm_triage.py        # Fase 5
 │   ├── relatorio.py         # Fase 7: relatorio dos confirmados (HTML, e CSV pela linha de comando)
 │   ├── campos.py            # proximo bloco 5x5 do ceu para o --proximo
-│   ├── util.py              # prazo de relogio nas chamadas de rede
+│   ├── util.py              # prazo de relogio nas chamadas de rede, espelhos do CDS e VizieR por lote de posicoes
 │   └── proper_motion.py     # util (pm_total, cor_w1w2)
 ├── tools/
 │   ├── recall_conhecidas.py # mede o recall dos cortes contra anas conhecidas
 │   ├── gerar_referencias.py # folhas de referencia da revisao (docs/img/ref_*.jpg)
-│   └── gerar_funil.py       # grafico do funil (docs/img/funil_fases.png), lido do banco
+│   ├── gerar_funil.py       # grafico do funil (docs/img/funil_fases.png), lido do banco
+│   ├── baixar_schneider2026.py # gera catalogos/schneider2026.csv a partir do codigo-fonte do arXiv
+│   └── gerar_demo.py        # gera demo/treino_demo.db, o banco da demo online
 ├── app/
 │   ├── revisao.py           # Fase 6: router do app Streamlit de revisao visual
 │   ├── estilo.py            # tema escuro, cabecalho, ficha e checklist (CSS/HTML)
@@ -367,18 +375,24 @@ Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alv
 │   ├── guia.py              # como ler as imagens, exemplos bom x ruim e pista do treino
 │   ├── cruzamento.py        # Gaia, Pan-STARRS e AllWISE, cruzados uma vez e guardados
 │   ├── execucao.py          # botao Buscar mais candidatas (pipeline em segundo plano)
+│   ├── envio.py             # conferencia "Pode enviar", resumo em ingles e envio
+│   ├── demo.py              # entrada da demo online, so o treino
 │   └── paginas/
 │       ├── fila.py          # revisao visual: fila, imagens e decisao
 │       └── treino.py        # modo treino: casos com resposta
+├── catalogos/
+│   └── schneider2026.csv    # candidatas L/T de Schneider+2026, descartadas na Fase 4
+├── demo/
+│   └── treino_demo.db       # casos e cruzamentos da demo online
+├── docs/                    # site de documentacao (paginas .md e img/)
+├── .github/workflows/       # CI dos testes e publicacao do site
 ├── .streamlit/
 │   └── config.toml          # tema escuro e barra de ferramentas minima
 ├── tests/
 │   └── test_units.py        # testes de unidade offline
-├── docs/img/                # figuras usadas neste README
-├── notebooks/
-│   └── inspecao_visual.ipynb # versao antiga da Fase 6 (so links)
 └── data/
     └── rastro.db            # resultados (gitignored)
+
 ```
 
 ## Dados e créditos
