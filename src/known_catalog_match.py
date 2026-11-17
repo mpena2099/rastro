@@ -85,7 +85,7 @@ def _cruzar_catalogos(df: pd.DataFrame) -> pd.DataFrame:
                 if usar_xmatch:
                     t = Table({"source_id": cand["source_id"].values, "ra": ra.values,
                                "dec": dec.values})
-                    r = com_prazo(lambda: XMatch.query(
+                    r = com_prazo(lambda t=t, tabela=tabela: XMatch.query(
                         cat1=t, cat2=f"vizier:{tabela}",
                         max_distance=CATALOGOS_RAIO_ARCSEC * u.arcsec,
                         colRA1="ra", colDec1="dec"), REDE_PRAZO_S)
@@ -107,7 +107,7 @@ def _cruzar_catalogos(df: pd.DataFrame) -> pd.DataFrame:
 
 def run():
     print("=" * 50)
-    print("Fase 4 — Cross-match SIMBAD (via CDS XMatch)")
+    print("Fase 4: Cross-match SIMBAD (via CDS XMatch)")
     print("=" * 50)
 
     conn = sqlite3.connect(str(SQLITE_PATH))
@@ -226,7 +226,7 @@ def _fallback_sequential(df):
 
     ra2000, dec2000 = posicao_j2000(df)
     match_ids = []
-    for i, row in df.iterrows():
+    for i in df.index:
         if i > 0 and i % 50 == 0:
             print(f"  {i}/{len(df)}...")
             sys.stdout.flush()

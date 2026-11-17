@@ -227,7 +227,7 @@ def parse_score(content: str) -> str:
 
 def run():
     print("=" * 50)
-    print("Fase 5 — Triagem LLM")
+    print("Fase 5: Triagem LLM")
     print("=" * 50)
 
     try:

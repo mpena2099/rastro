@@ -21,7 +21,6 @@ from src.proper_motion import add_pm_columns
 from src.llm_triage import parse_score, interpret_response
 from src.fetch_field import build_query, make_tiles
 from src.quality_filter import pmcode_sem_troca
-from src.known_catalog_match import posicao_j2000, MJD_J2000
 import config
 
 
@@ -113,7 +112,7 @@ def test_revisao_humana_persiste_e_valida():
     assert dados.ler_revisoes(conn)["source_id"].tolist() == ["A"]
     try:
         dados.salvar_revisao(conn, "C", "talvez")
-        assert False, "devia rejeitar decisao invalida"
+        raise AssertionError("devia rejeitar decisao invalida")
     except ValueError:
         pass
 
@@ -343,12 +342,12 @@ def test_com_prazo():
     assert com_prazo(lambda: 7, 1) == 7
     try:
         com_prazo(lambda: time.sleep(5), 0.2)
-        assert False, "devia estourar o prazo"
+        raise AssertionError("devia estourar o prazo")
     except TimeoutError:
         pass
     try:
         com_prazo(lambda: 1 / 0, 1)
-        assert False
+        raise AssertionError()
     except ZeroDivisionError:
         pass
 

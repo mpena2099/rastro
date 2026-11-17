@@ -76,7 +76,7 @@ def check_target(name: str, params: dict) -> dict:
 
 def run():
     print("=" * 50)
-    print("Fase 1 — Teste de sanidade")
+    print("Fase 1: Teste de sanidade")
     print("=" * 50)
 
     all_ok = True
@@ -94,7 +94,7 @@ def run():
             continue
 
         if not result["found"]:
-            print(f"  Nenhuma fonte. Pulando.")
+            print("  Nenhuma fonte. Pulando.")
             if is_primary:
                 all_ok = False
             continue

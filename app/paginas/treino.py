@@ -8,11 +8,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-import pandas as pd
 import streamlit as st
 
 from app import cruzamento, dados, estilo, imagens, guia
-from config import DEMO, ROOT, SQLITE_PATH
+from config import DEMO, SQLITE_PATH
 
 DESCRICAO = ("Casos de resposta conhecida (anãs já catalogadas, estrelas comuns e rejeitados pelo "
              "filtro de qualidade), para aprender a decidir antes da revisão de verdade. Você "

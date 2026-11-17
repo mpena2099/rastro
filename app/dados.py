@@ -256,7 +256,7 @@ WHERE 1=CONTAINS(POINT('ICRS',a.ra,a.dec), CIRCLE('ICRS',TAP_UPLOAD.t.ra,TAP_UPL
         up = Table.from_pandas(d[["rid", "ra", "dec"]].iloc[i:i + lote])
         for tent in range(3):
             try:
-                partes.append(com_prazo(lambda: svc.run_sync(q, uploads={"t": up}).to_table().to_pandas(),
+                partes.append(com_prazo(lambda up=up: svc.run_sync(q, uploads={"t": up}).to_table().to_pandas(),
                                         REDE_PRAZO_S))
                 break
             except Exception:

@@ -38,7 +38,7 @@ def passaria_na_fila(df: pd.DataFrame) -> pd.Series:
 
 def run():
     print("=" * 50)
-    print("Fase 3 — Filtragem de qualidade")
+    print("Fase 3: Filtragem de qualidade")
     print("=" * 50)
 
     conn = sqlite3.connect(str(SQLITE_PATH))

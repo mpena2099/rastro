@@ -20,7 +20,6 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import httpx
-import numpy as np
 import pandas as pd
 
 import config

@@ -97,7 +97,7 @@ def fetch_tile(ra_min, ra_max, dec_min, dec_max, depth: int = 0) -> pd.DataFrame
 
 def run(campo=None):
     print("=" * 50)
-    print("Fase 2 — Query CatWISE2020 via TAP")
+    print("Fase 2: Query CatWISE2020 via TAP")
     print("=" * 50)
 
     ra_range = (campo["ra_min"], campo["ra_max"]) if campo else FIELD_RA_RANGE

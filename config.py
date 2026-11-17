@@ -26,7 +26,7 @@ CATWISE_COLUMNS = [
     "meanobsmjd",
 ]
 
-# Fase 1 — sanity check targets
+# Fase 1: sanity check targets
 SANITY_TARGETS = {
     "WISE_0855": {
         "ra": 133.795125,
@@ -42,7 +42,7 @@ SANITY_TARGETS = {
     },
 }
 
-# Fase 2 — field query
+# Fase 2: field query
 # A regiao e varrida em ladrilhos quadrados de FIELD_STEP_DEG graus (em RA/Dec,
 # sem cruzar RA=0/360). O default cobre 25 graus quadrados em alta latitude
 # galactica (b ~ +50), onde ha pouca confusao de fontes.
@@ -55,7 +55,7 @@ PM_THRESHOLD_ARCSEC = 0.15
 # refeito, em vez de seguir com meio ladrilho.
 ROW_LIMIT = 20000
 
-# Fase 3 — quality filter
+# Fase 3: quality filter
 # W2 e a banda onde ana T/Y brilha; SNR baixo aqui deixa passar deteccao no
 # nivel do ruido com PM espurio (W2SNR_MIN=3 gerava "candidatos" invisiveis no
 # unWISE). 8 corta pra ~300 fontes no campo de teste.
@@ -67,7 +67,7 @@ W2SNR_MIN = 8.0
 PM_SIGNIF_MIN = 8.0
 N_AW_MAX = 1
 
-# Fase 4 — cross-match
+# Fase 4: cross-match
 SIMBAD_RADIUS_ARCSEC = 5
 SIMBAD_DELAY_S = 0.3
 # Listas de anas frias no VizieR (via CDS XMatch) que o SIMBAD nao cobre por inteiro:
@@ -98,7 +98,7 @@ CATALOGOS_ANAS_LOCAIS = {
     "catalogos/schneider2026.csv": "Schneider+2026 (Backyard Worlds)",
 }
 
-# Fase 5 — LLM triage (provider-agnostico, endpoint OpenAI-compativel)
+# Fase 5: LLM triage (provider-agnostico, endpoint OpenAI-compativel)
 #
 # Funciona com qualquer provider que exponha /chat/completions no formato
 # OpenAI: Gemini (via camada OpenAI-compat), OpenRouter, Groq, Ollama local.

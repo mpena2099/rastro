@@ -111,7 +111,7 @@ def vizier_por_posicoes(ra, dec, catalogo: str, raio_arcsec: float, colunas=(), 
     for i in range(0, len(ra), lote):
         alvo = SkyCoord(ra[i:i + lote] * u.deg, dec[i:i + lote] * u.deg)
         pedidas = ["**", "_q", "_r"] if todas_colunas else ["_q", "_r", *colunas]
-        r = com_prazo(lambda: Vizier(columns=pedidas, row_limit=-1, timeout=120)
+        r = com_prazo(lambda pedidas=pedidas, alvo=alvo: Vizier(columns=pedidas, row_limit=-1, timeout=120)
                       .query_region(alvo, radius=raio_arcsec * u.arcsec, catalog=catalogo), prazo_s)
         for t in r.values():
             d = t.to_pandas()
