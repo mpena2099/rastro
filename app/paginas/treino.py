@@ -71,26 +71,28 @@ def recomecar():
 
 
 if "casos" not in st.session_state:
-    try:
-        # semente nova a cada sessao: refazer o treino traz casos diferentes
-        semente = random.randrange(2**31)
-        casos = guia.casos_de_treino(semente)
-        # mesmo numero de casos por resposta: senao responder sempre a classe maior pontua bem
-        n = int(casos["resposta"].value_counts().min())
-        st.session_state.casos = (casos.groupby("resposta", group_keys=False)
-                                  .sample(n=n, random_state=semente)
-                                  .sample(frac=1, random_state=semente).reset_index(drop=True))
-    except Exception:
-        st.error("Não consegui montar os casos do treino. O treino online funciona sem "
-                 "instalar nada: https://rastro-treino.streamlit.app")
-        st.stop()
-    st.session_state.pos, st.session_state.pontos, st.session_state.respostas = 0, 0.0, {}
+    with st.spinner("Preparando o treino..."):
+        try:
+            # semente nova a cada sessao: refazer o treino traz casos diferentes
+            semente = random.randrange(2**31)
+            casos = guia.casos_de_treino(semente)
+            # mesmo numero de casos por resposta: senao responder sempre a classe maior pontua bem
+            n = int(casos["resposta"].value_counts().min())
+            st.session_state.casos = (casos.groupby("resposta", group_keys=False)
+                                      .sample(n=n, random_state=semente)
+                                      .sample(frac=1, random_state=semente).reset_index(drop=True))
+        except Exception:
+            st.error("Não consegui montar os casos do treino. O treino online funciona sem "
+                     "instalar nada: https://rastro-treino.streamlit.app")
+            st.stop()
+        st.session_state.pos, st.session_state.pontos, st.session_state.respostas = 0, 0.0, {}
 if st.session_state.casos.empty:
     st.warning("Não há casos de treino.")
     st.stop()
 if not st.session_state.get("casos_cruzados"):
     # mesmos cruzamentos da fila: sem eles o checklist marcava atencao em tudo
-    st.session_state.casos, _erros = cruzamento.completar(st.session_state.casos, "o treino", "caso")
+    with st.spinner("Cruzando catálogos (Gaia, Pan-STARRS, AllWISE)..."):
+        st.session_state.casos, _erros = cruzamento.completar(st.session_state.casos, "o treino", "caso")
     # uma tentativa por sessao: repetir a cada clique esperaria o servidor fora do ar toda vez
     st.session_state.casos_cruzados = True
     st.session_state.erros_cruzamento = _erros
