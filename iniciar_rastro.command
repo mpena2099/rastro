@@ -13,12 +13,12 @@ erro() {
 if [ ! -f venv/.instalado ]; then
     echo "Primeira vez: preparando o Rastro (alguns minutos)..."
     PY=""
-    for c in python3 python; do
-        if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(sys.version_info < (3, 10))'; then
+    for c in python3.13 python3.12 python3.11 python3.10 python3 python; do
+        if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(not ((3, 10) <= sys.version_info[:2] <= (3, 13)))'; then
             PY="$c"; break
         fi
     done
-    [ -n "$PY" ] || erro "Python 3.10 ou mais novo não encontrado. Instale em https://www.python.org/downloads/ e rode este arquivo de novo."
+    [ -n "$PY" ] || erro "Python de 3.10 a 3.13 não encontrado (o 3.14 ainda não é aceito). Instale um em https://www.python.org/downloads/ e rode este arquivo de novo."
     if [ ! -x venv/bin/python ]; then
         "$PY" -m venv venv || erro "Não consegui criar o ambiente (venv)."
     fi

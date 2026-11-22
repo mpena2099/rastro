@@ -28,6 +28,7 @@ def main() -> int:
     ap.add_argument("--porta", type=int, help="porta do Streamlit (padrao: a do Streamlit)")
     args = ap.parse_args()
     comando = [_python(), "-m", "streamlit", "run", "app/demo.py" if args.demo else "app/revisao.py"]
+    comando += ["--server.showEmailPrompt", "false"]
     if args.porta:
         comando += ["--server.port", str(args.porta)]
     try:

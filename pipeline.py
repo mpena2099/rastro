@@ -31,6 +31,11 @@ def run_all(campo: dict | None = None):
         print(f"{'=' * 60}")
         try:
             fn()
+        except SystemExit as e:
+            # a Fase 1 sai com sys.exit(1): sem a linha de ERRO o app nao mostra a falha
+            if e.code not in (0, None):
+                print(f"\nERRO em {nome}: encerrou com codigo {e.code}")
+            raise
         except Exception as e:
             print(f"\nERRO em {nome}: {e}")
             sys.exit(1)
@@ -47,6 +52,7 @@ def run_all(campo: dict | None = None):
 
 
 if __name__ == "__main__":
+    SQLITE_PATH.parent.mkdir(parents=True, exist_ok=True)
     ap = argparse.ArgumentParser(description="Pipeline do Rastro (fases 1 a 5)")
     ap.add_argument("--proximo", action="store_true",
                     help="escolhe sozinho o proximo campo do ceu ainda nao varrido")

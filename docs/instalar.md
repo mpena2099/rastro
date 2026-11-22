@@ -6,7 +6,7 @@ O app nunca foi usado de verdade no Windows nem no macOS, embora os testes autom
 
 ## 1. Instale o Python
 
-Baixe o Python 3.10 ou mais novo em [python.org/downloads](https://www.python.org/downloads/) e instale.
+Baixe o Python de 3.10 a 3.13 (o 3.14 ainda não é aceito) em [python.org/downloads](https://www.python.org/downloads/) e instale.
 
 - **Windows:** na primeira tela do instalador, marque **"Add python.exe to PATH"** antes de clicar em **Install Now**. Sem isso, o iniciador não acha o Python.
 - **macOS:** abra o arquivo `.pkg` baixado e siga as telas.

@@ -594,6 +594,64 @@ def test_envio_banco():
     assert envio.ler_envios(conn).empty
 
 
+def test_parear_com_a_fila():
+    # o treino pega, do pool, os casos mais parecidos com a fila em W2 e PM/sigma
+    from app import dados
+    pool = pd.DataFrame({"w2mpro": [12.0, 13.0, 16.2, 16.4, 14.0],
+                         "pm_signif": [60.0, 40.0, 10.0, 11.0, 30.0]})
+    fila = pd.DataFrame({"w2mpro": [16.3, 16.3], "pm_signif": [10.5, 10.5]})
+    escolhidos = dados._parear(pool, fila, 2, semente=0)
+    assert sorted(escolhidos["w2mpro"].tolist()) == [16.2, 16.4]
+    # sem repetir caso, mesmo quando a fila pede mais do que ha de parecido
+    assert len(set(dados._parear(pool, fila, 4, semente=0).index)) == 4
+
+
+def test_vizier_por_posicoes_divide_lote():
+    # o espelho do VizieR da 504 com lote grande: o lote que falha e dividido ao meio
+    from astropy.table import Table
+    from src import util
+    tamanhos = []
+
+    def falso_com_prazo(f, prazo):
+        alvo = f.__defaults__[0]
+        tamanhos.append(len(alvo))
+        if len(alvo) > 6:
+            raise TimeoutError("504")
+        return {"t": Table({"_q": list(range(1, len(alvo) + 1)), "_r": [0.5] * len(alvo),
+                            "Gmag": [15.0] * len(alvo)})}
+
+    original = util.com_prazo
+    util.com_prazo = falso_com_prazo
+    try:
+        d = util.vizier_por_posicoes(list(range(20)), [0.0] * 20, "I/355/gaiadr3", 3,
+                                     ["Gmag"], lote=20)
+    finally:
+        util.com_prazo = original
+    assert sorted(d["idx"].tolist()) == list(range(20))
+    assert tamanhos[0] == 20 and max(tamanhos[1:3]) == 10
+
+
+def test_execucao_comando_e_script():
+    from app import execucao
+    assert execucao.comando_exibido("pipeline.py --proximo", "linux") == \
+        "venv/bin/python -u pipeline.py --proximo"
+    assert execucao.comando_exibido("src/x.py", "win32") == "venv\\Scripts\\python -u src\\x.py"
+    assert execucao.casa_script(["python", "C:\\r\\pipeline.py", "--proximo"], "pipeline.py")
+    assert not execucao.casa_script(["python", "outro_pipeline.py"], "pipeline.py")
+
+
+def test_execucao_minutos_desde_inicio():
+    from app import execucao
+    original = execucao.ler_log
+    try:
+        execucao.ler_log = lambda: f"{execucao.INICIO} 1000\nFase 1"
+        assert execucao.minutos_desde_inicio(agora=1600) == 10
+        execucao.ler_log = lambda: "log antigo sem hora"
+        assert execucao.minutos_desde_inicio() is None
+    finally:
+        execucao.ler_log = original
+
+
 def test_app_demo_fumaca():
     # Um erro de import ou de layout so aparecia abrindo o app na mao. Roda num
     # subprocesso (app/demo.py descarta os modulos do projeto da memoria) e com proxy
