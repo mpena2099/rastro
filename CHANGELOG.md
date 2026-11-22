@@ -13,5 +13,6 @@ Primeira versão da ferramenta: o pipeline, o app de revisão e o site.
 - App Streamlit de revisão visual (fase 6), com fila, imagens, animação por época, checklist, treino e busca no VizieR.
 - Relatório dos confirmados (fase 7), pela linha de comando ou pelo app.
 - Conferência "Pode enviar", resumo em inglês e acompanhamento do envio a um astrônomo.
+- Treino com casos escolhidos parecidos com a fila em brilho e movimento sobre o erro.
 - Demo online só com o treino.
 - Site de documentação, iniciadores de clique duplo para Windows, macOS e Linux, e CI dos testes.
