@@ -443,13 +443,39 @@ def explicar_catalogado(nome, otype, sp_type) -> str:
             "uma estrela conhecida, mais quente que uma anã marrom.")
 
 
+def _parear(pool: pd.DataFrame, fila: pd.DataFrame, n: int, semente: int) -> pd.DataFrame:
+    """n linhas do pool parecidas com a fila real em brilho (W2) e PM/sigma.
+
+    Sorteia n candidatos da fila e, para cada um, pega o caso do pool ainda livre mais perto
+    em (W2 / 0,5 mag, log10 PM/sigma / 0,1). O treino fica com a dificuldade da fila: anas
+    conhecidas sao em geral 2 a 3 mag mais brilhantes que os candidatos.
+    """
+    n = min(n, len(pool))
+    if n == 0 or fila is None or fila.empty:
+        return pool.sample(n, random_state=semente)
+    def eixos(df):
+        return np.column_stack([df["w2mpro"].to_numpy(float) / 0.5,
+                                np.log10(df["pm_signif"].clip(lower=1).to_numpy(float)) / 0.1])
+    alvo = eixos(fila.sample(n, replace=len(fila) < n, random_state=semente))
+    livres = eixos(pool)
+    usados = []
+    for a in alvo:
+        d = ((livres - a) ** 2).sum(axis=1)
+        d[usados] = np.inf
+        usados.append(int(d.argmin()))
+    return pool.iloc[usados]
+
+
 def casos_treino(conhecidas: pd.DataFrame, estrelas: pd.DataFrame, rejeitados: pd.DataFrame,
-                 n_por_classe: int = 10, semente: int = 42) -> pd.DataFrame:
+                 n_por_classe: int = 10, semente: int = 42,
+                 fila: pd.DataFrame | None = None) -> pd.DataFrame:
     """Casos rotulados do modo treino, sorteados por classe e misturados.
 
     conhecidas: anas L/T/Y confirmadas (data/recall_conhecidas.pkl), estratificadas por tipo.
     estrelas: candidatos_fase4 com status='conhecido' (estrela comum de alto movimento).
     rejeitados: campo_bruto fora de candidatos_fase3; o corte de PM >= 0.3 e feito aqui.
+    fila: candidatos da fila real (w2mpro, pm_signif). Com ela, cada classe e pareada com a
+    fila em brilho e PM/sigma (_parear); sem ela, sorteio por tipo como antes.
     """
     from src.proper_motion import add_pm_columns
 
@@ -474,7 +500,17 @@ def casos_treino(conhecidas: pd.DataFrame, estrelas: pd.DataFrame, rejeitados: p
     # so anas que passariam pelos filtros da fila real: uma Y fraca com movimento abaixo
     # do erro e verdade, mas nao da para confirmar pelas imagens
     conhecidas = conhecidas[passaria_na_fila(conhecidas).values]
-    for _, grupo in preparar(conhecidas).groupby("tipo"):
+    if fila is not None and not fila.empty:
+        fila = preparar(fila)
+    pareado = fila is not None and not fila.empty
+    if pareado:
+        for x in _parear(preparar(conhecidas), fila, 3 * n_por_classe, semente).itertuples():
+            dificil = x.w2mpro >= 15.5 or x.pm_signif < 15
+            nota = " (caso difícil: fraca ou com movimento perto do limite, como na fila)" \
+                if dificil else ""
+            linhas.append({**linha(x), "resposta": "confirmado",
+                           "explicacao": f"Anã {x.sp_type} conhecida: {x.main_id}{nota}"})
+    for _, grupo in ([] if pareado else preparar(conhecidas).groupby("tipo")):
         # metade dos casos vem da metade de menor PM/sigma do tipo: as anas brilhantes e rapidas
         # sao faceis, e a fila real e feita de casos perto do corte
         grupo = grupo.sort_values("pm_signif")
@@ -493,14 +529,26 @@ def casos_treino(conhecidas: pd.DataFrame, estrelas: pd.DataFrame, rejeitados: p
         # ana marrom ou estrela ultrafria no SIMBAD nao e descarte claro neste projeto
         # sem otype (SIMBAD fora do ar) nao da para garantir que nao e ana: fica fora do gabarito
         e = e[e["otype"].notna() & ~e["otype"].isin(OTIPOS_ULTRAFRIAS)]
-    for x in e.sample(min(n_por_classe, len(e)), random_state=semente).itertuples():
+    e = _parear(e, fila, n_por_classe, semente) if pareado else \
+        e.sample(min(n_por_classe, len(e)), random_state=semente)
+    for x in e.itertuples():
         linhas.append({**linha(x), "resposta": "descartado",
                        "explicacao": explicar_catalogado(getattr(x, "simbad_match_id", "sem nome"),
                                                          getattr(x, "otype", None),
                                                          getattr(x, "sp_type", None))})
     rej = preparar(rejeitados)
     rej = rej[rej["pm_total"] >= 0.3]
-    for x in rej.sample(min(n_por_classe, len(rej)), random_state=semente).itertuples():
+    if {"n_aw", "cc_flags", "ab_flags", "pmcode"} <= set(rej):
+        # gabarito so com evidencia: rejeitado por flag de artefato/mistura, ou com movimento
+        # bem abaixo do erro. Quem caiu so por PM/sigma logo abaixo do corte pode ser ana real.
+        from src.quality_filter import pmcode_sem_troca
+        from config import N_AW_MAX, PM_SIGNIF_MIN
+        artefato = ((rej["n_aw"] > N_AW_MAX) | ~rej["cc_flags"].isin(["", "0000"])
+                    | (rej["ab_flags"] != "00") | ~pmcode_sem_troca(rej["pmcode"]))
+        rej = rej[artefato | (rej["pm_signif"] < PM_SIGNIF_MIN / 2)]
+    rej = _parear(rej, fila, n_por_classe, semente) if pareado else \
+        rej.sample(min(n_por_classe, len(rej)), random_state=semente)
+    for x in rej.itertuples():
         linhas.append({**linha(x), "resposta": "descartado",
                        "explicacao": "O filtro de qualidade da Fase 3 rejeitou: movimento provavelmente "
                                      "falso (artefato, mistura de fontes ou ajuste ruim)."})

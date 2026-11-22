@@ -27,12 +27,13 @@ with sqlite3.connect(str(SQLITE_PATH)) as conn:
                            "AND simbad_match_id IS NOT NULL", conn)
     bruto = pd.read_sql("SELECT * FROM campo_bruto", conn)
     fase3 = pd.read_sql("SELECT source_id FROM candidatos_fase3", conn)
+    fila = pd.read_sql("SELECT * FROM candidatos_fase4 WHERE status = 'candidato'", conn)
     salvos = dados.ler_cruzamentos(conn)
 estrelas = estrelas.merge(guia._tipos_simbad(estrelas["simbad_match_id"].tolist()),
                           on="simbad_match_id", how="left")
 casos = dados.casos_treino(pd.read_pickle(ROOT / "data" / "recall_conhecidas.pkl"), estrelas,
                            bruto[~bruto["source_id"].isin(fase3["source_id"])],
-                           n_por_classe=N_POR_CLASSE, semente=1)
+                           n_por_classe=N_POR_CLASSE, semente=1, fila=fila)
 print("casos:", casos["resposta"].value_counts().to_dict())
 
 cruz = salvos[salvos["source_id"].isin(casos["source_id"])]

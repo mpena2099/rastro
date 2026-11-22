@@ -1,6 +1,7 @@
 """Utilitarios de rede compartilhados pelo pipeline e pelo app."""
 
 import threading
+import time
 
 
 def com_prazo(fn, segundos: float):
@@ -92,6 +93,9 @@ def vizier_no_ar(prazo_s: float = 8.0) -> bool:
     return _responde(f"https://{VIZIER_ESPELHO or conf.server}/", prazo_s)
 
 
+LOTE_MINIMO = 5
+
+
 def vizier_por_posicoes(ra, dec, catalogo: str, raio_arcsec: float, colunas=(), lote: int = 200,
                         prazo_s: float = 180, todas_colunas: bool = False):
     """Fontes de um catalogo do VizieR perto de cada posicao, sem o XMatch (que nao tem espelho).
@@ -107,12 +111,28 @@ def vizier_por_posicoes(ra, dec, catalogo: str, raio_arcsec: float, colunas=(), 
     from astroquery.vizier import Vizier
 
     ra, dec = np.asarray(ra, dtype=float), np.asarray(dec, dtype=float)
+    pedidas = ["**", "_q", "_r"] if todas_colunas else ["_q", "_r", *colunas]
     partes = []
-    for i in range(0, len(ra), lote):
-        alvo = SkyCoord(ra[i:i + lote] * u.deg, dec[i:i + lote] * u.deg)
-        pedidas = ["**", "_q", "_r"] if todas_colunas else ["_q", "_r", *colunas]
-        r = com_prazo(lambda pedidas=pedidas, alvo=alvo: Vizier(columns=pedidas, row_limit=-1, timeout=120)
-                      .query_region(alvo, radius=raio_arcsec * u.arcsec, catalog=catalogo), prazo_s)
+    # (inicio, tamanho, tentativas): lote que falha (o espelho do IDIA da 504 com 50
+    # posicoes e responde com 5) e dividido ao meio; no tamanho minimo, refaz com pausa
+    pendentes = [(i, min(lote, len(ra) - i), 0) for i in range(0, len(ra), lote)][::-1]
+    while pendentes:
+        i, n, tent = pendentes.pop()
+        alvo = SkyCoord(ra[i:i + n] * u.deg, dec[i:i + n] * u.deg)
+        try:
+            r = com_prazo(lambda alvo=alvo: Vizier(columns=pedidas, row_limit=-1, timeout=120)
+                          .query_region(alvo, radius=raio_arcsec * u.arcsec, catalog=catalogo),
+                          prazo_s)
+        except Exception:
+            if n > LOTE_MINIMO:
+                meio = n // 2
+                pendentes += [(i + meio, n - meio, 0), (i, meio, 0)]
+            elif tent < 2:
+                time.sleep(5 * (tent + 1))
+                pendentes.append((i, n, tent + 1))
+            else:
+                raise
+            continue
         for t in r.values():
             d = t.to_pandas()
             d["idx"] = d["_q"].astype(int) - 1 + i
