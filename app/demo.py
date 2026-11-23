@@ -40,4 +40,10 @@ from app.estilo import css
 
 st.set_page_config(page_title="Rastro: treino", page_icon="🔭", layout="wide")
 st.markdown(css(), unsafe_allow_html=True)
+
+if "src.util" not in sys.modules:
+    # importar src.util testa o CDS e o espelho do VizieR (ate ~30 s com o CDS fora):
+    # sem isto a pagina fica em branco nesse tempo
+    with st.spinner("Conferindo se os catálogos do CDS estão no ar (até 30 s na primeira abertura)..."):
+        import src.util  # noqa: F401
 st.navigation([st.Page("paginas/treino.py", title="Treino", icon=":material/school:", default=True)]).run()
