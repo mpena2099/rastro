@@ -22,8 +22,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        # 3.10 e o ambiente local; 3.13 e o da demo no Streamlit Community Cloud
-        python: ["3.10", "3.13"]
+        # 3.11 e o ambiente local; 3.13 e o da demo no Streamlit Community Cloud
+        python: ["3.11", "3.13"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

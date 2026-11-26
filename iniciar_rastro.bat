@@ -7,17 +7,17 @@ if exist "venv\.instalado" goto abrir
 
 echo Primeira vez: preparando o Rastro (alguns minutos)...
 set PY=
-for %%V in (3.13 3.12 3.11 3.10) do (
+for %%V in (3.13 3.12 3.11) do (
     if not defined PY (
         py -%%V -c "import sys" >nul 2>nul && set PY=py -%%V
     )
 )
 if not defined PY (
-    where python >nul 2>nul && python -c "import sys; sys.exit(not ((3, 10) <= sys.version_info[:2] <= (3, 13)))" >nul 2>nul && set PY=python
+    where python >nul 2>nul && python -c "import sys; sys.exit(not ((3, 11) <= sys.version_info[:2] <= (3, 13)))" >nul 2>nul && set PY=python
 )
 if not defined PY (
     echo.
-    echo Python de 3.10 a 3.13 nao encontrado ^(o 3.14 ainda nao e aceito^).
+    echo Python de 3.11 a 3.13 nao encontrado ^(o 3.14 ainda nao e aceito^).
     echo Instale um em https://www.python.org/downloads/ e marque a opcao "Add python.exe to PATH" no instalador.
     echo Depois rode este arquivo de novo.
     pause

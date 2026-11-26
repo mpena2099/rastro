@@ -3,7 +3,7 @@
 [![testes](https://github.com/mpena2099/rastro/actions/workflows/testes.yml/badge.svg)](https://github.com/mpena2099/rastro/actions/workflows/testes.yml)
 [![Documentação](https://img.shields.io/badge/docs-online-2e7d32.svg)](https://mpena2099.github.io/rastro/)
 [![Licença: MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue.svg)](LICENSE)
-[![Python 3.10 a 3.13](https://img.shields.io/badge/python-3.10--3.13-3776AB.svg)](requirements.txt)
+[![Python 3.11 a 3.13](https://img.shields.io/badge/python-3.11--3.13-3776AB.svg)](requirements.txt)
 [![demo: online](https://img.shields.io/badge/demo-online-2e7d32.svg)](https://rastro-treino.streamlit.app)
 [![Discussões](https://img.shields.io/badge/chat-Discuss%C3%B5es-555.svg)](https://github.com/mpena2099/rastro/discussions)
 
