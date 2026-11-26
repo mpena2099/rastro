@@ -272,7 +272,10 @@ sel_envio = st.sidebar.selectbox(
     "Envio", list(OPCOES_ENVIO), key="envio_filtro",
     help="Confirmados a enviar a um astrônomo e os já enviados. Fora de 'Qualquer', vale no "
          "lugar da Situação.")
-gaia = st.sidebar.radio("Contraparte no Gaia", ["Qualquer", "Sem Gaia", "Com Gaia"], index=1,
+# Abre em "Sem Gaia" so enquanto houver pendente sem Gaia; senao a fila abria vazia.
+_sem_gaia_pendente = bool(((todos["decisao"] == "pendente") & (todos["gaia_detectada"] == False)).any())  # noqa: E712
+gaia = st.sidebar.radio("Contraparte no Gaia", ["Qualquer", "Sem Gaia", "Com Gaia"],
+                        index=1 if _sem_gaia_pendente else 0,
                         help="Com Gaia costuma ser estrela comum já conhecida.")
 ps1 = st.sidebar.radio("Detecção óptica (Pan-STARRS)", ["Qualquer", "Sem detecção", "Com detecção"],
                        help="Anãs T e Y somem no óptico, mas anãs L aparecem. Use pra ordenar, não pra descartar.")
@@ -330,7 +333,13 @@ if _linhas and _linhas != st.session_state.get("sel_aplicada") and _linhas[0] < 
 for e in erros_cruz:
     st.warning(f"Sem cruzamento, {e}")
 if total == 0:
-    st.info("Nenhum candidato na fila com esses filtros.")
+    escondidos = pendentes if not busca and "pendente" in sel_decisao else 0
+    if escondidos:
+        st.info(f"Nenhum candidato na fila com esses filtros. Os {escondidos} pendente(s) estão "
+                "escondidos pelos filtros da lateral (o de Gaia começa em 'Sem Gaia'): "
+                "ponha 'Qualquer' para vê-los.")
+    else:
+        st.info("Nenhum candidato na fila com esses filtros.")
     st.stop()
 
 st.session_state.pos = max(0, min(total - 1, st.session_state.pos))
