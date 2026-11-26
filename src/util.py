@@ -53,6 +53,10 @@ def usar_espelhos_cds():
 
     if not _responde(f"https://{simbad_conf.server}/simbad/sim-id?Ident=Vega&output.format=ASCII"):
         simbad_conf.server = "simbad.harvard.edu"
+        # o Simbad pronto do astroquery guardou o servidor ao importar; sem isso a Fase 1
+        # (Simbad.query_region) continua no CDS fora do ar
+        from astroquery.simbad import Simbad
+        Simbad.server = simbad_conf.server
         print("  SIMBAD do CDS fora do ar: usando o espelho de Harvard.")
 
     if _responde(f"https://{vizier_conf.server}/viz-bin/votable?-source=I/239/hip_main&-out.max=1"):
