@@ -22,7 +22,7 @@ _CSS = """
     --rastro-suave: #9AA4B5;
     --rastro-borda: #232C3B;
 }
-.block-container { padding-top: 1rem; max-width: 1400px; }
+.block-container { padding-top: 4rem; max-width: 1400px; }
 /* texto branco sobre o laranja fica com pouco contraste */
 button[kind="primary"], button[kind="primary"] p { color: var(--rastro-fundo) !important; font-weight: 600; }
 [data-testid="stAppDeployButton"], #MainMenu { display: none; }
