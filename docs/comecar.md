@@ -48,7 +48,7 @@ python -c "from src.llm_triage import run; run()"
 
 ## Triagem por LLM (Fase 5)
 
-Esta é a única fase que precisa de chave, e é opcional: sem chave, a busca pula a triagem e os candidatos entram na fila como "sem triagem". É **provider-agnóstico**: fala o formato OpenAI (`/chat/completions`) via `httpx`, sem SDK. Trocar de provider é só mudar três coisas em `config.py`: `LLM_BASE_URL`, `LLM_MODEL` e de onde vem a chave. Há exemplos comentados pra Gemini, OpenRouter, Zhipu e Ollama.
+Esta é a única fase que precisa de chave, e é opcional: sem chave, a busca pula a triagem e os candidatos entram na fila como "sem triagem". É **provider-agnóstico**: fala o formato OpenAI (`/chat/completions`) via `httpx`, sem SDK. Trocar de provider é mudar `LLM_BASE_URL`, `LLM_MODEL` e de onde vem a chave: `LLM_API_KEY_ENV` e, para o arquivo `auth.json`, `LLM_API_KEY_FILE_PROVIDER`. Há exemplos comentados pra Gemini, OpenRouter, Zhipu e Ollama.
 
 - **Default: Groq free** (`openai/gpt-oss-20b`, modo texto com `reasoning_effort` baixo). Chave grátis, sem cartão, em [console.groq.com](https://console.groq.com). Cota (tokens/min e tokens/dia) é **por modelo**, então dá pra alternar de modelo se um esgotar.
 - **Alternativa sem cota diária** (pra iterar bastante): **Zhipu GLM-4.7-Flash**, perpetuamente free (exemplo pronto no `config.py`).
@@ -71,6 +71,8 @@ Esta é a única fase que precisa de chave, e é opcional: sem chave, a busca pu
    setx GROQ_API_KEY "gsk_cole_a_sua_chave_aqui"
    ```
 
+   O Rastro aberto antes de gravar a chave não a enxerga: feche a janela do iniciador e abra de novo. No Linux, a chave no `~/.bashrc` vale quando o Rastro é aberto pelo terminal (`./iniciar_rastro.command`); quem abre por atalho, sem terminal, grava o `export` no `~/.profile` e sai e entra na sessão.
+
    Não coloque a chave em `config.py` nem em nenhum arquivo do repositório: ela iria parar no git.
 
 4. Teste a chave (o mesmo comando nos três sistemas, com o ambiente ativado). Se aparecer uma lista de modelos, está certa; `Invalid API Key` quer dizer chave errada ou incompleta:
@@ -87,7 +89,7 @@ Esta é a única fase que precisa de chave, e é opcional: sem chave, a busca pu
 
 **Quando a cota acaba.** A Fase 5 tria os `LLM_BATCH_SIZE` (60) candidatos de maior movimento próprio, com uma pausa de `LLM_REQUEST_DELAY_S` (8 s) entre chamadas para respeitar o limite por minuto. Se o limite por minuto estourar, ela espera e tenta de novo sozinha. Se a **cota diária** acabar, cada chamada restante falha na hora com a mensagem "cota diaria do free tier esgotada" e o candidato fica com score `erro`. Aí há três saídas: esperar o reset (no dia seguinte, no fuso do Groq), trocar `LLM_MODEL` por outro modelo do Groq (a cota é separada por modelo) ou usar um dos outros provedores abaixo.
 
-**Outro provedor.** Mude em `config.py` as linhas `LLM_BASE_URL`, `LLM_MODEL` e `LLM_API_KEY_ENV` (há exemplos prontos comentados para Gemini, OpenRouter, Zhipu e Ollama) e exporte a chave com o nome que você pôs em `LLM_API_KEY_ENV`. Com Ollama local, use `LLM_API_KEY_ENV = None`: não há chave.
+**Outro provedor.** Mude em `config.py` as linhas `LLM_BASE_URL`, `LLM_MODEL` e `LLM_API_KEY_ENV` (há exemplos prontos comentados para Gemini, OpenRouter, Zhipu e Ollama) e exporte a chave com o nome que você pôs em `LLM_API_KEY_ENV`. Quem usa o arquivo `auth.json` também muda `LLM_API_KEY_FILE_PROVIDER` para o nome do provider no arquivo. Com Ollama local, use `LLM_API_KEY_ENV = None`: não há chave.
 
 A chave é lida por `load_api_key()` da variável em `LLM_API_KEY_ENV`. Se a variável não existir, há um segundo lugar, conveniente para quem usa o OpenCode: o arquivo `~/.local/share/opencode/auth.json` (campo `<provider>.key`), caminho do Linux e do macOS. No Windows, use a variável. O projeto não lê arquivo `.env`.
 
@@ -97,7 +99,7 @@ A triagem pode usar **saída estruturada** (`response_format` json_schema, `LLM_
 
 Há dois níveis de teste, do mais rápido ao mais completo:
 
-**1. Testes de unidade (offline, sem rede, instantâneos).** Cobrem a lógica pura que quebra calada se alguém mexer: derivação de movimento próprio e de sua significância (`pm_signif`), filtro de `pmcode`, recuo de posição pra J2000 no cross-match, parsing do score da LLM (incluindo a regra "`alta` só via veredito explícito") e a montagem da query da Fase 2.
+**1. Testes de unidade (não dependem dos serviços estarem no ar).** Cobrem a lógica pura que quebra calada se alguém mexer: derivação de movimento próprio e de sua significância (`pm_signif`), filtro de `pmcode`, recuo de posição pra J2000 no cross-match, parsing do score da LLM (incluindo a regra "`alta` só via veredito explícito") e a montagem da query da Fase 2. Importar `src/util.py` testa os espelhos do CDS, então a execução pode levar alguns segundos.
 
 ```bash
 python tests/test_units.py      # runner embutido, sem dependencia
@@ -114,4 +116,4 @@ Não há mocks das APIs externas (IRSA/SIMBAD/LLM): a filosofia aqui é validar 
 
 ## Configuração
 
-Tudo centralizado em `config.py`: região do céu, limiares de PM/SNR/flags, alvos de sanidade, provider/modelo da LLM, caminhos. Mudar comportamento do pipeline é mexer aqui, não nos módulos.
+Tudo centralizado em `config.py`: região do céu (`FIELD_RA_RANGE` e `FIELD_DEC_RANGE`), limiares de PM/SNR/flags, alvos de sanidade, provider/modelo da LLM, caminhos. Mudar comportamento do pipeline é mexer aqui, não nos módulos.

@@ -28,11 +28,11 @@ Na primeira vez, uma janela preta mostra a instalação das bibliotecas, que lev
 
 ## 4. Primeiro uso
 
-1. Na página **Revisão**, clique em **Buscar mais candidatas** (duas vezes, para confirmar). A busca escolhe sozinha uma região do céu, baixa o CatWISE2020, filtra e descarta os objetos já conhecidos. Leva de minutos a algumas horas, conforme a região.
+1. Na página **Revisão**, clique em **Buscar mais candidatas** e depois em **Sim, buscar**. A busca escolhe sozinha uma região do céu, baixa o CatWISE2020, filtra e descarta os objetos já conhecidos. Leva de minutos a algumas horas, conforme a região.
 2. Enquanto isso, use a página **Treino**. Antes da primeira busca, ela usa os mesmos casos da [demo online](https://rastro-treino.streamlit.app).
 3. Quando a busca terminar, os candidatos aparecem na **Revisão**.
 
-A triagem por LLM (Fase 5) é opcional. Sem a chave da API configurada, a busca pula essa fase e os candidatos entram na fila como "sem triagem". A revisão visual funciona igual.
+A triagem por LLM (Fase 5) é opcional. Sem a chave da API configurada, a busca pula essa fase e os candidatos entram na fila como "sem triagem". A revisão visual funciona igual. Para configurar a chave, siga [Configurar a chave do Groq, passo a passo](comecar.md#configurar-a-chave-do-groq-passo-a-passo); depois de gravar a chave, feche o Rastro (a janela do iniciador) e abra de novo, senão a busca não vê a chave.
 
 ## Atualizar
 

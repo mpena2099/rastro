@@ -12,22 +12,26 @@ A Fase 6 é a inspeção visual humana, feita num app Streamlit local. Para cada
 
 A lista é de *suspeitos*, não de descobertas. O caminho depois dela:
 
-1. **Olhar as imagens** dos suspeitos, começando pelos que o AllWISE mostra se movendo (a nota da IA é só um comentário). O app `app/revisao.py` mostra os recortes de cada suspeito e grava sua decisão. Os recortes mostram se há um objeto real ali; o movimento aparece na animação "Movimento" (quadros do W2 por época, do WiseView) e no teste do AllWISE.
+1. **Olhar as imagens** dos suspeitos, começando pelos que o AllWISE mostra se movendo (a nota da IA é só um comentário). O app mostra os recortes de cada suspeito e grava sua decisão. Espere passar dezenas sem nenhum candidato óbvio: a fila é feita de fontes fracas, quase todas ruído. Os recortes mostram se há um objeto real ali; o movimento aparece na animação "Movimento" (quadros do W2 por época, do WiseView) e no teste do AllWISE.
 2. **Descartar os falsos alarmes.** Na prática, quase todos caem aqui: ruído, defeito do instrumento ou ponto mal medido.
 3. **Levar os que sobrarem a um astrônomo**, que pode confirmar com outras observações (um espectro, por exemplo) e, se for novo de verdade, publicar.
 
 ## O app
 
-Para abrir, rode `python iniciar.py` (veja [Começar](comecar.md#como-usar)). O app abre no navegador com a fila de candidatos pendentes e sem contraparte no Gaia, com os que o AllWISE mostra se movendo primeiro e depois do mais ao menos significativo. Na primeira abertura ele cruza a lista com Gaia, Pan-STARRS e AllWISE (alguns segundos). As páginas ficam em `app/paginas/` (`fila.py` para a revisão e `treino.py` para o treino), e o tema escuro e os componentes visuais vêm de `.streamlit/config.toml` e `app/estilo.py`. O guia "O que procurar em cada imagem" explica como ler as três imagens e o que decide. Quando a fila acabar, o botão "Buscar mais candidatas" (com confirmação, progresso e cancelamento) escolhe sozinho o próximo bloco do céu e roda o pipeline; o mesmo pelo terminal é `python -u pipeline.py --proximo`.
+Para abrir, rode `python iniciar.py` (veja [Começar](comecar.md#como-usar)). O app abre no navegador com a fila de candidatos pendentes e sem contraparte no Gaia, com os que o AllWISE mostra se movendo primeiro e depois do mais ao menos significativo. Na primeira abertura ele cruza a lista com Gaia e Pan-STARRS (~10 s) e depois com o AllWISE (~1 min). As páginas ficam em `app/paginas/` (`fila.py` para a revisão e `treino.py` para o treino), e o tema escuro e os componentes visuais vêm de `.streamlit/config.toml` e `app/estilo.py`. O guia "O que procurar em cada imagem" explica como ler as três imagens e o que decide. Quando a fila acabar, o botão "Buscar mais candidatas" (com confirmação, progresso e cancelamento) escolhe sozinho o próximo bloco do céu e roda o pipeline; o mesmo pelo terminal é `python -u pipeline.py --proximo`.
 
 ## Na barra lateral
 
 - **Situação:** pendentes, confirmados, dúvidas, descartados ou todos, cada um com a contagem. É por aqui que se revê o que já foi classificado.
 - **Buscar por código:** acha qualquer candidato pelo código (ou pelo final dele), em qualquer situação.
-- **Filtros** de Gaia, Pan-STARRS, movimento no AllWISE, PM/σ mínimo e nota da IA, e a **ordenação**.
-- **Já foi publicado?** Um botão consulta o VizieR inteiro em volta do candidato e destaca os catálogos de anãs ou de movimento próprio, com a distância. A Fase 4 só cruza as listas conhecidas, e é assim que se acha um catálogo novo que ainda não entrou nelas. Use antes de confirmar. O relatório da Fase 7 faz a mesma busca para cada candidato.
-- **Relatório (Fase 7):** no corpo da página, o botão "Gerar relatório" monta uma página HTML com os confirmados (ou confirmados e dúvidas, se marcar a caixa) e o botão "Baixar relatório" entrega o arquivo. Leva alguns segundos por candidato, para baixar os recortes.
-- No corpo da página, o quadro "Fila completa" lista a fila, e um clique numa linha abre aquele candidato.
+- **Filtros** de Gaia, Pan-STARRS, movimento no AllWISE, PM/σ mínimo e nota da IA, e a **ordenação**. O filtro de Gaia abre em "Sem Gaia" só enquanto há pendente sem Gaia; senão, em "Qualquer".
+
+## No corpo da página
+
+- **Já foi publicado?** O botão "Buscar no VizieR" consulta o VizieR inteiro em volta do candidato e destaca os catálogos de anãs ou de movimento próprio, com a distância. A Fase 4 só cruza as listas conhecidas, e é assim que se acha um catálogo novo que ainda não entrou nelas. Use antes de confirmar. O relatório da Fase 7 faz a mesma busca para cada candidato.
+- **Enviar a um astrônomo:** para cada confirmado, um painel diz se ele **pode ir para fora** (todos os itens ok: checklist, SIMBAD, listas de anãs e busca no VizieR, que decide pela distância se a lista achada é o mesmo objeto), traz um resumo em inglês pronto para colar e registra o envio e a resposta. O filtro **Envio** separa a enviar, enviados, aceitos e recusados; o app confere uma vez por dia se um enviado já aparece no SIMBAD como anã. Detalhes em [Relatório e segunda opinião](https://mpena2099.github.io/rastro/relatorio/).
+- **Relatório (Fase 7):** o botão "Gerar relatório" monta uma página HTML com os confirmados (ou confirmados e dúvidas, se marcar a caixa) e o botão "Baixar relatório" entrega o arquivo. Leva de 20 s a 1 min por candidato, pela busca no VizieR.
+- **Fila completa:** o quadro lista a fila, e um clique numa linha abre aquele candidato.
 
 ## O teste do AllWISE
 
@@ -98,7 +102,7 @@ Em cada linha: infravermelho (unWISE NEO7) e óptico (Legacy Surveys). As três 
 
 **Quando entram candidatos novos?** Só quando você roda uma busca nova: o botão "Buscar mais candidatas" (ou `python pipeline.py --proximo`) varre a próxima região do céu e acrescenta os candidatos dela à fila. Os já revisados continuam com a decisão.
 
-**O que quer dizer o filtro "Com Gaia"?** O Gaia mede no óptico. Uma anã marrom é fria e quase não emite luz visível, então raramente aparece nele; um ponto com contraparte no Gaia costuma ser estrela comum já conhecida. Por isso o filtro começa em "Sem Gaia".
+**O que quer dizer o filtro "Com Gaia"?** O Gaia mede no óptico. Uma anã marrom é fria e quase não emite luz visível, então raramente aparece nele; um ponto com contraparte no Gaia costuma ser estrela comum já conhecida. Por isso o filtro abre em "Sem Gaia" quando há pendente sem Gaia; sem pendente, abre em "Qualquer".
 
 **E o filtro do Pan-STARRS?** Também é óptico, mas mais fundo que o Gaia. Anãs T e Y somem nele, enquanto anãs L aparecem. Serve para ordenar a fila, não para descartar.
 

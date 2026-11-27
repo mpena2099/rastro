@@ -24,7 +24,7 @@ Pipeline de mineração de dados astronômicos que caça **anãs marrons e estre
 
 **O que o programa faz, passo a passo.** Pense numa peneira com várias malhas, cada uma deixando passar menos gente:
 
-1. **Confere as ferramentas.** Procura dois objetos famosos que já se conhece. Se não os achar, algo está errado e o programa para.
+1. **Confere as ferramentas.** Procura dois objetos famosos que já se conhece. Se não achar a Luhman 16, algo está errado e o programa para; a WISE 0855 só gera aviso.
 2. **Baixa um pedaço do céu.** Hoje, 25 graus quadrados (quadrados de 1 grau por 1 grau, cada um com cerca de 5 vezes a área da Lua cheia), só com pontos que se movem rápido.
 3. **Joga fora medidas duvidosas.** Defeitos do instrumento, pontos colados em vizinhos e movimentos pequenos demais pra distinguir de erro de medida.
 4. **Joga fora o que já é conhecido.** Compara com o SIMBAD, o grande cadastro de objetos astronômicos, e com listas publicadas de anãs frias que o SIMBAD ainda não absorveu.
@@ -39,7 +39,7 @@ Pipeline de mineração de dados astronômicos que caça **anãs marrons e estre
 ## O que entra, o que sai
 
 **O que alimenta o programa**
-- **Uma região do céu**, dada por coordenadas (RA e Dec) em `config.py`, e os limiares dos filtros (quão rápido o ponto tem de se mover, quão nítida a medida precisa ser).
+- **Uma região do céu**, dada por `FIELD_RA_RANGE` e `FIELD_DEC_RANGE` em `config.py`, e os limiares dos filtros (quão rápido o ponto tem de se mover, quão nítida a medida precisa ser).
 - **Dois bancos de dados públicos**, baixados da internet na hora: a tabela CatWISE2020 (NASA/IPAC) e o cadastro SIMBAD (CDS, Estrasburgo).
 - **Uma chave grátis de IA** (Groq), só pra nota da última fase. Ela é opcional: sem chave, a busca pula a triagem.
 
@@ -51,11 +51,13 @@ Uma tabela, `candidatos_fase5`, no arquivo `data/rastro.db`. Cada linha é um **
 python -c "import sqlite3, pandas as pd; print(pd.read_sql('SELECT source_id, ra, dec, pm_total, llm_triage_score FROM candidatos_fase5 ORDER BY pm_total DESC', sqlite3.connect('data/rastro.db')))"
 ```
 
+Sem a chave da LLM, a Fase 5 é pulada e a tabela `candidatos_fase5` não é criada: os suspeitos ficam em `candidatos_fase4`, com `status='candidato'`. Nesse caso, troque `candidatos_fase5` por `candidatos_fase4` e `llm_triage_score` por `status` no comando.
+
 **O que fazer com o resultado**
 
 A lista é de *suspeitos*, não de descobertas. O caminho depois dela:
 
-1. **Olhar as imagens** dos suspeitos, começando pelos que o AllWISE mostra se movendo (a nota da IA é só um comentário). O app `app/revisao.py` mostra os recortes de cada suspeito e grava sua decisão. Espere passar dezenas sem nenhum candidato óbvio: a fila é feita de fontes fracas, quase todas ruído. Veja [Revisão e treino](revisao.md).
+1. **Olhar as imagens** dos suspeitos, começando pelos que o AllWISE mostra se movendo (a nota da IA é só um comentário). O app mostra os recortes de cada suspeito e grava sua decisão. Espere passar dezenas sem nenhum candidato óbvio: a fila é feita de fontes fracas, quase todas ruído. Os recortes mostram se há um objeto real ali; o movimento aparece na animação "Movimento" (quadros do W2 por época, do WiseView) e no teste do AllWISE. Veja [Revisão e treino](revisao.md).
 2. **Descartar os falsos alarmes.** Na prática, quase todos caem aqui: ruído, defeito do instrumento ou ponto mal medido.
 3. **Levar os que sobrarem a um astrônomo**, que pode confirmar com outras observações (um espectro, por exemplo) e, se for novo de verdade, publicar.
 

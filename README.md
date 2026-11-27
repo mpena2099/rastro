@@ -41,7 +41,7 @@ Rastro is a data-mining pipeline that hunts for **uncatalogued brown dwarfs and 
 
 **O que o programa faz, passo a passo.** Pense numa peneira com várias malhas, cada uma deixando passar menos gente:
 
-1. **Confere as ferramentas.** Procura dois objetos famosos que já se conhece. Se não os achar, algo está errado e o programa para.
+1. **Confere as ferramentas.** Procura dois objetos famosos que já se conhece. Se não achar a Luhman 16, algo está errado e o programa para; a WISE 0855 só gera aviso.
 2. **Baixa um pedaço do céu.** Hoje, 25 graus quadrados (quadrados de 1 grau por 1 grau, cada um com cerca de 5 vezes a área da Lua cheia), só com pontos que se movem rápido.
 3. **Joga fora medidas duvidosas.** Defeitos do instrumento, pontos colados em vizinhos e movimentos pequenos demais pra distinguir de erro de medida.
 4. **Joga fora o que já é conhecido.** Compara com o SIMBAD, o grande cadastro de objetos astronômicos, e com listas publicadas de anãs frias que o SIMBAD ainda não absorveu.
@@ -56,7 +56,7 @@ Rastro is a data-mining pipeline that hunts for **uncatalogued brown dwarfs and 
 ## O que entra, o que sai e o que fazer com isso
 
 **O que alimenta o programa**
-- **Uma região do céu**, dada por coordenadas (RA e Dec) em `config.py`, e os limiares dos filtros (quão rápido o ponto tem de se mover, quão nítida a medida precisa ser).
+- **Uma região do céu**, dada por `FIELD_RA_RANGE` e `FIELD_DEC_RANGE` em `config.py`, e os limiares dos filtros (quão rápido o ponto tem de se mover, quão nítida a medida precisa ser).
 - **Dois bancos de dados públicos**, baixados da internet na hora: a tabela CatWISE2020 (NASA/IPAC) e o cadastro SIMBAD (CDS, Estrasburgo).
 - **Uma chave grátis de IA** (Groq), só pra nota da última fase.
 
@@ -68,10 +68,12 @@ Uma tabela, `candidatos_fase5`, no arquivo `data/rastro.db`. Cada linha é um **
 python -c "import sqlite3, pandas as pd; print(pd.read_sql('SELECT source_id, ra, dec, pm_total, llm_triage_score FROM candidatos_fase5 ORDER BY pm_total DESC', sqlite3.connect('data/rastro.db')))"
 ```
 
+Sem a chave da LLM, a Fase 5 é pulada e a tabela `candidatos_fase5` não é criada: os suspeitos ficam em `candidatos_fase4`, com `status='candidato'`. Nesse caso, troque `candidatos_fase5` por `candidatos_fase4` e `llm_triage_score` por `status` no comando.
+
 **O que fazer com o resultado**
 
 A lista é de *suspeitos*, não de descobertas. O caminho depois dela:
-1. **Olhar as imagens** dos suspeitos, começando pelos que o AllWISE mostra se movendo (a nota da IA é só um comentário). O app `app/revisao.py` (veja [Como usar](#como-usar)) mostra os recortes de cada suspeito e grava sua decisão. Espere passar dezenas sem nenhum candidato óbvio: a fila é feita de fontes fracas, quase todas ruído. Os recortes mostram se há um objeto real ali; o movimento aparece na animação "Movimento" (quadros do W2 por época, do WiseView) e no teste do AllWISE.
+1. **Olhar as imagens** dos suspeitos, começando pelos que o AllWISE mostra se movendo (a nota da IA é só um comentário). O app mostra os recortes de cada suspeito e grava sua decisão. Espere passar dezenas sem nenhum candidato óbvio: a fila é feita de fontes fracas, quase todas ruído. Os recortes mostram se há um objeto real ali; o movimento aparece na animação "Movimento" (quadros do W2 por época, do WiseView) e no teste do AllWISE.
 2. **Descartar os falsos alarmes.** Na prática, quase todos caem aqui: ruído, defeito do instrumento ou ponto mal medido.
 3. **Levar os que sobrarem a um astrônomo**, que pode confirmar com outras observações (um espectro, por exemplo) e, se for novo de verdade, publicar.
 
@@ -179,7 +181,7 @@ Fases sequenciais. Cada uma lê a tabela produzida pela anterior no SQLite e gra
 
 | Fase | O que faz | Status |
 |------|-----------|--------|
-| 1 | **Teste de sanidade**: redescobre Luhman 16 (PM ~2,7"/ano) e WISE 0855 (PM ~8"/ano) via CatWISE2020 + SIMBAD. Se Luhman 16 falhar, o pipeline aborta, porque não faz sentido caçar objetos novos com uma stack que não acha os conhecidos. WISE 0855 só gera aviso | ✅ |
+| 1 | **Teste de sanidade**: redescobre Luhman 16 (PM ~2,8"/ano) e WISE 0855 (PM ~8"/ano) via CatWISE2020 + SIMBAD. Se Luhman 16 falhar, o pipeline aborta, porque não faz sentido caçar objetos novos com uma stack que não acha os conhecidos. WISE 0855 só gera aviso | ✅ |
 | 2 | **Query ao CatWISE2020** (ADQL/TAP) numa região do céu, varrida em ladrilhos de 1 grau (um ladrilho que estoura o limite de linhas é dividido em 4), filtrando no servidor por movimento próprio, astrometria (ka=km=3) e qualidade de W2 (SNR e flag). Sem corte em W1: anãs Y são fracas nessa banda | ✅ |
 | 3 | **Filtragem fina de qualidade**: remove contaminação/artefatos por `cc_flags`/`ab_flags`, troca do componente principal (`pmcode` B=N), confusão de fontes (`n_aw`) e movimento próprio pouco significativo (PM/σ < 8) | ✅ |
 | 4 | **Cross-match contra SIMBAD** (via CDS XMatch em lote): descarta o que já é catalogado. O SIMBAD usa posições em J2000 e o CatWISE mede em ~2015, então a posição é recuada pelo movimento próprio antes do match. Sem isso, fontes com PM acima de ~0,3"/ano escapam como "novas". Depois, os que sobram são cruzados com 11 listas de anãs frias do VizieR (`CATALOGOS_ANAS` em `config.py`, como Karpov+2025, Kirkpatrick+2021/2024 e Best+2018) e com as 3.086 candidatas L/T do Backyard Worlds em Schneider+2026, que ainda não estão no VizieR (`catalogos/schneider2026.csv`), nas duas épocas, porque o SIMBAD demora a absorver catálogos novos | ✅ |
@@ -187,7 +189,7 @@ Fases sequenciais. Cada uma lê a tabela produzida pela anterior no SQLite e gra
 | 6 | **Inspeção visual humana** (app Streamlit): recortes unWISE e óptico com mira na posição, animação do W2 por época, checklist com sugestão do pipeline, números, link pro WiseView, teste de movimento contra o AllWISE, busca por código e filtro por situação, decisão confirmar/dúvida/descartar gravada em `revisao_humana` | ✅ |
 | 7 | **Relatório** dos confirmados (HTML com imagens embutidas), gerado por botão no app ou por `python src/relatorio.py` (que também grava um CSV), pra enviar a um astrônomo e pedir uma segunda opinião. Manual, como a Fase 6 | ✅ |
 
-**Quanto os cortes deixam passar.** Os limiares foram medidos contra 949 anãs L/T/Y já conhecidas (`python tools/recall_conhecidas.py`, usa rede, ~8 min). Com os cortes atuais passam **76%** delas (L 80%, T 70%, Y 77%). Duas medições mudaram o desenho: filtrar o primeiro dígito do `pmcode` (A=1) derrubava o recall de 76% pra 25%, porque ele mede vizinhança e não qualidade; e cortar por SNR em W1 perdia metade das anãs Y. As conhecidas são as mais brilhantes, então o recall pra anãs ainda não descobertas tende a ser menor.
+**Quanto os cortes deixam passar.** Os limiares foram medidos contra 949 anãs L/T/Y já conhecidas (`python tools/recall_conhecidas.py`, usa rede, ~8 min). Com os cortes atuais passam **76%** delas (L 80%, T 70%, Y 77%). Duas medições mudaram o desenho: filtrar o primeiro dígito do `pmcode` (A=1) derrubava o recall de 75% pra 25%, porque ele mede vizinhança e não qualidade; e cortar por SNR em W1 perdia metade das anãs Y. As conhecidas são as mais brilhantes, então o recall pra anãs ainda não descobertas tende a ser menor.
 
 ## Como usar
 
@@ -230,16 +232,18 @@ python iniciar.py    # sobe o app e abre o navegador; usa o venv do projeto sozi
 
 É o mesmo que `streamlit run app/revisao.py`, sem precisar ativar o venv. `python iniciar.py --demo` abre só o treino, como na demo online, e `--porta 8600` escolhe a porta.
 
-O app abre no navegador com a fila de candidatos pendentes e sem contraparte no Gaia, com os que o AllWISE mostra se movendo primeiro e depois do mais ao menos significativo. Na primeira abertura ele cruza a lista com Gaia, Pan-STARRS e AllWISE (alguns segundos). As páginas ficam em `app/paginas/` (`fila.py` para a revisão e `treino.py` para o treino), e o tema escuro e os componentes visuais vêm de `.streamlit/config.toml` e `app/estilo.py`. O guia "O que procurar em cada imagem" explica como ler as três imagens e o que decide. Quando a fila acabar, o botão "Buscar mais candidatas" (com confirmação, progresso e cancelamento) escolhe sozinho o próximo bloco do céu e roda o pipeline; o mesmo pelo terminal é `python -u pipeline.py --proximo`.
+O app abre no navegador com a fila de candidatos pendentes e sem contraparte no Gaia, com os que o AllWISE mostra se movendo primeiro e depois do mais ao menos significativo. Na primeira abertura ele cruza a lista com Gaia e Pan-STARRS (~10 s) e depois com o AllWISE (~1 min). As páginas ficam em `app/paginas/` (`fila.py` para a revisão e `treino.py` para o treino), e o tema escuro e os componentes visuais vêm de `.streamlit/config.toml` e `app/estilo.py`. O guia "O que procurar em cada imagem" explica como ler as três imagens e o que decide. Quando a fila acabar, o botão "Buscar mais candidatas" (com confirmação, progresso e cancelamento) escolhe sozinho o próximo bloco do céu e roda o pipeline; o mesmo pelo terminal é `python -u pipeline.py --proximo`.
 
 Na barra lateral:
 - **Situação:** pendentes, confirmados, dúvidas, descartados ou todos, cada um com a contagem. É por aqui que se revê o que já foi classificado.
 - **Buscar por código:** acha qualquer candidato pelo código (ou pelo final dele), em qualquer situação.
-- **Filtros** de Gaia, Pan-STARRS, movimento no AllWISE, PM/σ mínimo e nota da IA, e a **ordenação**.
-- **Já foi publicado?** Um botão consulta o VizieR inteiro em volta do candidato e destaca os catálogos de anãs ou de movimento próprio, com a distância. A Fase 4 só cruza as listas conhecidas, e é assim que se acha um catálogo novo que ainda não entrou nelas. Use antes de confirmar. O relatório da Fase 7 faz a mesma busca para cada candidato.
+- **Filtros** de Gaia, Pan-STARRS, movimento no AllWISE, PM/σ mínimo e nota da IA, e a **ordenação**. O filtro de Gaia abre em "Sem Gaia" só enquanto há pendente sem Gaia; senão, em "Qualquer".
+
+No corpo da página:
+- **Já foi publicado?** O botão "Buscar no VizieR" consulta o VizieR inteiro em volta do candidato e destaca os catálogos de anãs ou de movimento próprio, com a distância. A Fase 4 só cruza as listas conhecidas, e é assim que se acha um catálogo novo que ainda não entrou nelas. Use antes de confirmar. O relatório da Fase 7 faz a mesma busca para cada candidato.
 - **Enviar a um astrônomo:** para cada confirmado, um painel diz se ele **pode ir para fora** (todos os itens ok: checklist, SIMBAD, listas de anãs e busca no VizieR, que decide pela distância se a lista achada é o mesmo objeto), traz um resumo em inglês pronto para colar e registra o envio e a resposta. O filtro **Envio** separa a enviar, enviados, aceitos e recusados; o app confere uma vez por dia se um enviado já aparece no SIMBAD como anã. Detalhes em [Relatório e segunda opinião](https://mpena2099.github.io/rastro/relatorio/).
-- **Relatório (Fase 7):** no corpo da página, o botão "Gerar relatório" monta uma página HTML com os confirmados (ou confirmados e dúvidas, se marcar a caixa) e o botão "Baixar relatório" entrega o arquivo. Leva alguns segundos por candidato, para baixar os recortes.
-- No corpo da página, o quadro "Fila completa" lista a fila, e um clique numa linha abre aquele candidato.
+- **Relatório (Fase 7):** o botão "Gerar relatório" monta uma página HTML com os confirmados (ou confirmados e dúvidas, se marcar a caixa) e o botão "Baixar relatório" entrega o arquivo. Leva de 20 s a 1 min por candidato, pela busca no VizieR.
+- **Fila completa:** o quadro lista a fila, e um clique numa linha abre aquele candidato.
 
 **O teste do AllWISE.** O AllWISE mediu o céu uns 5 anos antes do CatWISE. Se o movimento próprio de um candidato for real, a fonte tem de aparecer lá na posição recuada pelo movimento, e não onde ela está hoje. O app marca cada candidato como *se moveu (confere)*, *não se moveu*, *ambíguo*, *sem fonte* ou *PM baixo demais pra testar*. O AllWISE é mais raso que o CatWISE, então um candidato fraco quase sempre cai em "sem fonte", e isso não prova nada.
 
@@ -262,7 +266,7 @@ python -c "from src.llm_triage import run; run()"
 
 Há dois níveis de teste, do mais rápido ao mais completo:
 
-**1. Testes de unidade (offline, sem rede, instantâneos).** Cobrem a lógica pura que quebra calada se alguém mexer: derivação de movimento próprio e de sua significância (`pm_signif`), filtro de `pmcode`, recuo de posição pra J2000 no cross-match, parsing do score da LLM (incluindo a regra "`alta` só via veredito explícito") e a montagem da query da Fase 2.
+**1. Testes de unidade (não dependem dos serviços estarem no ar).** Cobrem a lógica pura que quebra calada se alguém mexer: derivação de movimento próprio e de sua significância (`pm_signif`), filtro de `pmcode`, recuo de posição pra J2000 no cross-match, parsing do score da LLM (incluindo a regra "`alta` só via veredito explícito") e a montagem da query da Fase 2. Importar `src/util.py` testa os espelhos do CDS, então a execução pode levar alguns segundos.
 
 ```bash
 python tests/test_units.py      # runner embutido, sem dependencia
@@ -279,7 +283,7 @@ Não há mocks das APIs externas (IRSA/SIMBAD/LLM): a filosofia aqui é validar 
 
 ## Triagem por LLM (Fase 5)
 
-Esta é a única fase que precisa de chave, e é opcional: sem chave, a busca pula a triagem e os candidatos entram na fila como "sem triagem". É **provider-agnóstico**: fala o formato OpenAI (`/chat/completions`) via `httpx`, sem SDK. Trocar de provider é só mudar três coisas em `config.py`: `LLM_BASE_URL`, `LLM_MODEL` e de onde vem a chave. Há exemplos comentados pra Gemini, OpenRouter, Zhipu e Ollama.
+Esta é a única fase que precisa de chave, e é opcional: sem chave, a busca pula a triagem e os candidatos entram na fila como "sem triagem". É **provider-agnóstico**: fala o formato OpenAI (`/chat/completions`) via `httpx`, sem SDK. Trocar de provider é mudar `LLM_BASE_URL`, `LLM_MODEL` e de onde vem a chave: `LLM_API_KEY_ENV` e, para o arquivo `auth.json`, `LLM_API_KEY_FILE_PROVIDER`. Há exemplos comentados pra Gemini, OpenRouter, Zhipu e Ollama.
 
 - **Default: Groq free** (`openai/gpt-oss-20b`, modo texto com `reasoning_effort` baixo). Chave grátis, sem cartão, em [console.groq.com](https://console.groq.com). Cota (tokens/min e tokens/dia) é **por modelo**, então dá pra alternar de modelo se um esgotar.
 - **Alternativa sem cota diária** (pra iterar bastante): **Zhipu GLM-4.7-Flash**, perpetuamente free (exemplo pronto no `config.py`).
@@ -302,6 +306,8 @@ Esta é a única fase que precisa de chave, e é opcional: sem chave, a busca pu
    setx GROQ_API_KEY "gsk_cole_a_sua_chave_aqui"
    ```
 
+   O Rastro aberto antes de gravar a chave não a enxerga: feche a janela do iniciador e abra de novo. No Linux, a chave no `~/.bashrc` vale quando o Rastro é aberto pelo terminal (`./iniciar_rastro.command`); quem abre por atalho, sem terminal, grava o `export` no `~/.profile` e sai e entra na sessão.
+
    Não coloque a chave em `config.py` nem em nenhum arquivo do repositório: ela iria parar no git.
 4. Teste a chave (o mesmo comando nos três sistemas, com o ambiente ativado). Se aparecer uma lista de modelos, está certa; `Invalid API Key` quer dizer chave errada ou incompleta:
 
@@ -317,7 +323,7 @@ Esta é a única fase que precisa de chave, e é opcional: sem chave, a busca pu
 
 **Quando a cota acaba.** A Fase 5 tria os `LLM_BATCH_SIZE` (60) candidatos de maior movimento próprio, com uma pausa de `LLM_REQUEST_DELAY_S` (8 s) entre chamadas para respeitar o limite por minuto. Se o limite por minuto estourar, ela espera e tenta de novo sozinha. Se a **cota diária** acabar, cada chamada restante falha na hora com a mensagem "cota diaria do free tier esgotada" e o candidato fica com score `erro`. Aí há três saídas: esperar o reset (no dia seguinte, no fuso do Groq), trocar `LLM_MODEL` por outro modelo do Groq (a cota é separada por modelo) ou usar um dos outros provedores abaixo.
 
-**Outro provedor.** Mude em `config.py` as linhas `LLM_BASE_URL`, `LLM_MODEL` e `LLM_API_KEY_ENV` (há exemplos prontos comentados para Gemini, OpenRouter, Zhipu e Ollama) e exporte a chave com o nome que você pôs em `LLM_API_KEY_ENV`. Com Ollama local, use `LLM_API_KEY_ENV = None`: não há chave.
+**Outro provedor.** Mude em `config.py` as linhas `LLM_BASE_URL`, `LLM_MODEL` e `LLM_API_KEY_ENV` (há exemplos prontos comentados para Gemini, OpenRouter, Zhipu e Ollama) e exporte a chave com o nome que você pôs em `LLM_API_KEY_ENV`. Quem usa o arquivo `auth.json` também muda `LLM_API_KEY_FILE_PROVIDER` para o nome do provider no arquivo. Com Ollama local, use `LLM_API_KEY_ENV = None`: não há chave.
 
 A chave é lida por `load_api_key()` da variável em `LLM_API_KEY_ENV`. Se a variável não existir, há um segundo lugar, conveniente para quem usa o OpenCode: o arquivo `~/.local/share/opencode/auth.json` (campo `<provider>.key`), caminho do Linux e do macOS. No Windows, use a variável. O projeto não lê arquivo `.env`.
 
